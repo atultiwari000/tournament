@@ -35,32 +35,31 @@ export default function AuthPageLayout({
   children,
 }: AuthPageLayoutProps) {
   return (
-    <div className="relative min-h-screen grid lg:grid-cols-2">
+    <div className="flex min-h-screen">
       {/* Left: Form area - centered and using full height */}
-      <div className="relative z-20 flex flex-col justify-center p-6 md:p-12">
-        {/* Form container - allow wider form and prevent overflow; add readable backdrop */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-full max-w-md bg-white/95 dark:bg-slate-900/85 rounded-lg shadow-lg p-6 backdrop-blur-md">
+      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-8 border border-slate-200 dark:border-slate-700">
             {children}
           </div>
         </div>
       </div>
 
-      {/* Right: Full-bleed hero image (covers entire page including left area) */}
-      <div className="absolute inset-0 hidden lg:block z-0">
+      {/* Right: Hero image column - hidden on mobile, visible on lg+ screens */}
+      <div className="hidden lg:flex lg:flex-1 relative h-screen">
         <img
           src={heroImage}
           alt={heroAlt}
-          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
-          aria-hidden="true"
+          className="w-full h-screen object-cover"
         />
-        {/* Gradient overlay for contrast */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/20 to-transparent pointer-events-none" />
+
+        {/* Gradient overlay for better text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 
         {/* Hero caption */}
-        <div className="absolute right-12 bottom-12 text-white max-w-sm pointer-events-none z-10">
-          <h2 className="text-2xl font-bold">{heroTitle}</h2>
-          <p className="mt-2 text-sm">{heroDescription}</p>
+        <div className="absolute bottom-12 left-12 right-12 text-white z-10">
+          <h2 className="text-3xl font-bold mb-3">{heroTitle}</h2>
+          <p className="text-lg text-white/90">{heroDescription}</p>
         </div>
       </div>
     </div>
