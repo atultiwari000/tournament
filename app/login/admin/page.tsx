@@ -7,21 +7,6 @@ export default function LoginPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left: Form area - centered and using full height */}
       <div className="flex flex-col justify-center p-6 md:p-12">
-        {/* Branding / header */}
-        <div className="mb-6">
-          <a href="/" className="flex items-center gap-3 font-medium">
-            <div className="bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex w-10 h-10 items-center justify-center rounded-md">
-              <GalleryVerticalEnd className="w-5 h-5" />
-            </div>
-            <div className="leading-tight">
-              <span className="text-lg font-semibold block">Futsal</span>
-              <span className="text-xs text-muted-foreground block">
-                Book your court
-              </span>
-            </div>
-          </a>
-        </div>
-
         {/* Form container - allow wider form and prevent overflow */}
         <div className="flex-1 flex items-center justify-center">
           <div className="w-full max-w-md">
@@ -33,8 +18,8 @@ export default function LoginPage() {
       {/* Right: Illustration / placeholder - show only on large screens */}
       <div className="relative hidden lg:flex items-center justify-center bg-gray-50 overflow-hidden">
         <img
-          src="/placeholder.svg"
-          alt="Illustration"
+          src="/images/placeholder-admin.svg"
+          alt="Illustration: admin dashboard"
           className="w-full h-full object-cover"
         />
         {/* subtle overlay for better contrast */}

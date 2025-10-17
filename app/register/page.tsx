@@ -119,32 +119,6 @@ export default function RegisterPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left: Form area - centered and using full height */}
       <div className="flex flex-col justify-center p-6 md:p-12">
-        {/* Branding / header */}
-        <div className="mb-6">
-          <a href="/" className="flex items-center gap-3 font-medium">
-            <div className="bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex w-10 h-10 items-center justify-center rounded-md">
-              {/* simple icon */}
-              <svg
-                className="w-5 h-5"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <path
-                  d="M3 12c0-1.657 1.343-3 3-3h12c1.657 0 3 1.343 3 3v4c0 1.657-1.343 3-3 3H6c-1.657 0-3-1.343-3-3v-4z"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
-            <div className="leading-tight">
-              <span className="text-lg font-semibold block">Futsal</span>
-              <span className="text-xs text-muted-foreground block">
-                Book your court
-              </span>
-            </div>
-          </a>
-        </div>
-
         {/* Form container - allow wider form and prevent overflow */}
         <div className="flex-1 flex items-center justify-center">
           <div className="w-full max-w-md">
@@ -246,8 +220,8 @@ export default function RegisterPage() {
       {/* Right: Illustration / placeholder - show only on large screens */}
       <div className="relative hidden lg:flex items-center justify-center bg-gray-50 overflow-hidden">
         <img
-          src="/placeholder.svg"
-          alt="Illustration"
+          src="/images/placeholder-register.svg"
+          alt="Illustration: onboarding and account creation"
           className="w-full h-full object-cover"
         />
         {/* subtle overlay for better contrast */}
