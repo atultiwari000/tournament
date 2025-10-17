@@ -11,16 +11,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { RegisterForm } from "@/components/register-form";
 
 /**
  * RegisterPage (refactored)
@@ -122,97 +113,7 @@ export default function RegisterPage() {
         {/* Form container - allow wider form and prevent overflow */}
         <div className="flex-1 flex items-center justify-center">
           <div className="w-full max-w-md">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create your account</CardTitle>
-                <CardDescription>
-                  Register with email & password or continue with Google
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <div>
-                    <label className="text-sm block mb-1">Full name</label>
-                    <Input
-                      placeholder="Your full name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm block mb-1">Email</label>
-                    <Input
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm block mb-1">Password</label>
-                    <Input
-                      type="password"
-                      placeholder="Create a password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm block mb-1">
-                      Confirm password
-                    </label>
-                    <Input
-                      type="password"
-                      placeholder="Confirm password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Button type="submit" disabled={loading}>
-                      {loading ? "Creating..." : "Create account"}
-                    </Button>
-
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-px bg-border" />
-                      <div className="text-xs text-muted-foreground px-2">
-                        or
-                      </div>
-                      <div className="flex-1 h-px bg-border" />
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleGoogle}
-                      disabled={loading}
-                    >
-                      Continue with Google
-                    </Button>
-
-                    <div className="text-sm text-muted-foreground text-center">
-                      Already have an account?{" "}
-                      <a href="/login" className="underline">
-                        Sign in
-                      </a>
-                    </div>
-                  </div>
-                </form>
-              </CardContent>
-
-              <CardFooter className="text-xs text-muted-foreground">
-                By creating an account you agree to our terms of service.
-              </CardFooter>
-            </Card>
+            <RegisterForm />
           </div>
         </div>
       </div>
