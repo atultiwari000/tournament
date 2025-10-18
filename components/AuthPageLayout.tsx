@@ -3,6 +3,7 @@
 import React from "react";
 import { Trophy } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface AuthPageLayoutProps {
   heroImage: string;
@@ -36,6 +37,21 @@ export default function AuthPageLayout({
   heroAlt = "Hero illustration",
   children,
 }: AuthPageLayoutProps) {
+  const pathname = usePathname();
+  const isLogin = pathname?.startsWith("/auth/login");
+  const isRegister = pathname?.startsWith("/auth/register");
+
+  // determine role context from the pathname (admin / manager / user)
+  let roleContext: "admin" | "manager" | "user" = "user";
+  if (
+    pathname?.includes("/auth/login/admin") ||
+    pathname?.includes("/auth/register/admin")
+  ) {
+    roleContext = "admin";
+  } else if (pathname?.includes("/manager")) {
+    roleContext = "manager";
+  }
+
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Left: Form area with branding */}
