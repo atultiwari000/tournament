@@ -30,7 +30,7 @@ import { mapAuthError } from "@/lib/auth";
 /**
  * Manager Login form with email/password + Google
  * - After successful sign-in we check that a users/{uid} document exists and role is manager.
- * - If the user document exists and role is manager, redirect to `next` (or /).
+ * - If the user document exists and role is manager, redirect to `next` (or /dashboard).
  * - If it does not exist or wrong role, sign the user out and redirect to /register/manager with email prefilled.
  */
 export function ManagerLoginForm({
@@ -44,7 +44,7 @@ export function ManagerLoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
-  const next = searchParams?.get("next") ?? "/";
+  const next = searchParams?.get("next") ?? "/dashboard";
 
   // Inline field errors for better UX
   const [emailError, setEmailError] = useState<string | null>(null);

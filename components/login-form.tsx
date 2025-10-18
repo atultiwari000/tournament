@@ -58,14 +58,22 @@ export function LoginForm({
       const snap = await getDoc(userRef);
       if (snap.exists()) {
         const userData = snap.data();
-        if (userData.role === "user") {
+        const role = userData.role ?? "user";
+
+        // Redirect based on role:
+        // - regular users -> `next` (default: "/")
+        // - managers -> "/dashboard"
+        // - admins -> "/admin"
+        if (role === "user") {
           router.replace(next);
+        } else if (role === "manager") {
+          router.replace("/dashboard");
+        } else if (role === "admin") {
+          router.replace("/admin");
         } else {
-          // Wrong role, sign out and show error
+          // Unknown role: sign out and show a helpful message
           await signOut(auth);
-          setError(
-            "This account is not a user account. Please use the appropriate login.",
-          );
+          setError("Unrecognized account role. Please contact support.");
         }
       } else {
         // If user doc not present, sign out and send to register
