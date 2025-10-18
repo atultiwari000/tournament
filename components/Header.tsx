@@ -75,15 +75,21 @@ export default function Header() {
 
   // Role-aware navigation:
   // - regular users (or unauthenticated) see Home / Venues / About
-  // - managers and admins see Dashboard
-  const navLinks =
-    role === "manager" || role === "admin"
-      ? [{ href: "/dashboard", label: "Dashboard" }]
-      : [
-          { href: "/", label: "Home" },
-          { href: "/venues", label: "Venues" },
-          { href: "/about", label: "About" },
-        ];
+  // - managers and admins see a single link labeled "Dashboard"
+  //   that points to the appropriate dashboard path per role.
+  const navLinks = (() => {
+    if (role === "admin") {
+      return [{ href: "/admin", label: "Dashboard" }];
+    }
+    if (role === "manager") {
+      return [{ href: "/dashboard", label: "Dashboard" }];
+    }
+    return [
+      { href: "/", label: "Home" },
+      { href: "/venues", label: "Venues" },
+      { href: "/about", label: "About" },
+    ];
+  })();
 
   const handleSignOut = async () => {
     try {
