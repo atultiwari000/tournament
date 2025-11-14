@@ -16,16 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
-/**
- * Professional Navbar
- *
- * - Branding/logo on the left.
- * - Center navigation with active link highlighting (hidden on small screens).
- * - Right side: user area with avatar dropdown (Profile, Settings, History, Logout).
- * - Responsive: simple mobile menu toggle for small screens.
- *
- * Hooks are called unconditionally to respect React rules.
- */
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -34,19 +24,16 @@ export default function Header() {
   const [role, setRole] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Auth subscription + fetch role from Firestore
   useEffect(() => {
     let mounted = true;
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
 
-      // Clear role when signed out
       if (!u) {
         setRole(null);
         return;
       }
 
-      // Try to load the user's role from Firestore (collection `users/{uid}`)
       try {
         const userRef = doc(db, "users", u.uid);
         const snap = await getDoc(userRef);
@@ -68,15 +55,10 @@ export default function Header() {
     };
   }, []);
 
-  // Hide header on auth pages (login and register)
   if (pathname && pathname.startsWith("/auth")) {
     return null;
   }
 
-  // Role-aware navigation:
-  // - regular users (or unauthenticated) see Home / Venues / About
-  // - managers and admins see a single link labeled "Dashboard"
-  //   that points to the appropriate dashboard path per role.
   const navLinks = (() => {
     if (role === "admin") {
       return [{ href: "/admin", label: "Dashboard" }];
@@ -94,7 +76,6 @@ export default function Header() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      // redirect to login after sign out
       router.replace("/auth/login");
     } catch (err) {
       console.error("Sign out failed:", err);
@@ -105,10 +86,8 @@ export default function Header() {
     <header className="w-full bg-white border-b">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Branding */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
-              {/* Simple inline SVG logo; replace with your actual logo if available */}
               <div className="w-10 h-10 rounded-md bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center">
                 <svg
                   width="20"
@@ -133,7 +112,6 @@ export default function Header() {
             </Link>
           </div>
 
-          {/* Center navigation - hidden on small screens */}
           <nav className="hidden sm:flex gap-6">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -153,16 +131,13 @@ export default function Header() {
             })}
           </nav>
 
-          {/* Right side: user / sign-in */}
           <div className="flex items-center gap-3">
-            {/* Mobile menu toggle */}
             <button
               className="sm:hidden p-2 rounded-md hover:bg-accent/5"
               aria-label="Toggle menu"
               onClick={() => setMobileOpen((s) => !s)}
             >
               {mobileOpen ? (
-                // X icon
                 <svg
                   width="20"
                   height="20"
@@ -179,7 +154,6 @@ export default function Header() {
                   />
                 </svg>
               ) : (
-                // Hamburger icon
                 <svg
                   width="20"
                   height="20"
@@ -255,7 +229,6 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile menu dropdown */}
         {mobileOpen && (
           <div className="sm:hidden mt-2 pb-4">
             <div className="flex flex-col gap-2">
