@@ -433,18 +433,21 @@ export async function bookSlot(
         (slot) => !(slot.date === date && slot.startTime === startTime)
       );
       
+      // Only include defined fields (Firestore arrayUnion doesn't accept undefined)
       const bookedSlot: BookedSlot = {
         date,
         startTime,
         bookingId: bookingData.bookingId,
         bookingType: bookingData.bookingType,
         status: bookingData.status,
-        customerName: bookingData.customerName,
-        customerPhone: bookingData.customerPhone,
-        notes: bookingData.notes,
-        userId: bookingData.userId,
         createdAt: Timestamp.now(),
       };
+      
+      // Add optional fields only if they are defined
+      if (bookingData.customerName !== undefined) bookedSlot.customerName = bookingData.customerName;
+      if (bookingData.customerPhone !== undefined) bookedSlot.customerPhone = bookingData.customerPhone;
+      if (bookingData.notes !== undefined) bookedSlot.notes = bookingData.notes;
+      if (bookingData.userId !== undefined) bookedSlot.userId = bookingData.userId;
       
       transaction.update(docRef, {
         bookings: arrayUnion(bookedSlot),

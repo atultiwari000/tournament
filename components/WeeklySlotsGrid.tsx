@@ -255,6 +255,10 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
     setIsProcessing(true);
 
     try {
+      // Get venue price
+      const venueDoc = await getDoc(doc(db, "venues", groundId));
+      const venuePrice = venueDoc.exists() ? venueDoc.data().pricePerHour : 1000;
+
       // 1. Hold the slot
       const bookingId = `booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
@@ -282,7 +286,7 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
         bookingType: "website",
         holdExpiresAt: Timestamp.fromDate(holdExpiresAt),
         createdAt: serverTimestamp(),
-        amount: 1000, // TODO: Get from venue pricing
+        amount: venuePrice,
       };
 
       const bookingRef = await addDoc(collection(db, "bookings"), bookingData);

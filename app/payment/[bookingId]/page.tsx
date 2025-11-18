@@ -241,7 +241,7 @@ const PaymentPage = () => {
   }
 
   const isExpired =
-    booking.status !== "PENDING_PAYMENT" ||
+    booking.status !== "pending_payment" ||
     (timeLeft !== null && timeLeft <= 0);
   const minutes = timeLeft !== null ? Math.floor(timeLeft / 60) : 0;
   const seconds = timeLeft !== null ? timeLeft % 60 : 0;
@@ -271,17 +271,13 @@ const PaymentPage = () => {
             <div>
               <p className="text-muted-foreground">Time</p>
               <p className="font-semibold">
-                {booking.startTime} -{" "}
-                {(parseInt(booking.startTime.split(":")[0]) + 1)
-                  .toString()
-                  .padStart(2, "0")}
-                :00
+                {booking.startTime} - {booking.endTime}
               </p>
             </div>
           </div>
           <div className="border bg-muted rounded-lg p-4 space-y-2">
             <p className="text-muted-foreground">Total Price</p>
-            <p className="text-3xl font-bold">Rs. {booking.price}</p>
+            <p className="text-3xl font-bold">Rs. {booking.amount || booking.price || 0}</p>
           </div>
 
           {!isExpired ? (
