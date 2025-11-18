@@ -371,8 +371,12 @@ const VenueMap = () => {
     mapRef.current?.flyTo([venue.latitude, venue.longitude], 16);
   };
 
-  const handleViewDetails = (venueId: string) => {
-    router.push(`/venue/${venueId}`);
+  const handleViewDetails = (venueId: string, type?: string) => {
+    if (type === "manager"){
+      router.push(`/manager/venue-settings?id=${venueId}`);
+    }else{
+      router.push(`/venue/${venueId}`);
+    }
   };
 
   return (
@@ -602,7 +606,7 @@ const VenueMap = () => {
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewDetails(venue.id);
+                            handleViewDetails(venue.id, "manager");
                           }}
                           size="sm"
                           className="w-full"
