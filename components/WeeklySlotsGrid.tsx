@@ -68,6 +68,7 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   
   // Dialog states
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<ReconstructedSlot | null>(null);
   
   // Physical booking form
@@ -76,6 +77,9 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
     customerPhone: "",
     notes: "",
   });
+  
+  // Block slot form
+  const [blockReason, setBlockReason] = useState("");
   
   const [isManager, setIsManager] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -184,10 +188,21 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   // ============================================================================
 
   const handleSlotClick = (slot: ReconstructedSlot) => {
+    // User can't click held slots (except their own - they should go to payment)
+    if (!isManager && slot.status === "HELD") {
+      return;
+    }
+
     // User booking
     if (!isManager && slot.status === "AVAILABLE") {
       setSelectedSlot(slot);
       setBookingDialogOpen(true);
+      return;
+    }
+
+    // Manager unblock blocked slots
+    if (isManager && slot.status === "BLOCKED") {
+      handleUnblockSlot(slot);
       return;
     }
 
@@ -197,7 +212,8 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
       return;
     }
 
-    // Manager reserve slot
+    // Manager reserve slot (right-click or long-press for block?)
+    // For now, clicking available = book, we'll add a button for block
     if (isManager && slot.status === "AVAILABLE") {
       handlePhysicalReservation(slot);
       return;
@@ -205,8 +221,13 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   };
 
   const canClickSlot = (slot: ReconstructedSlot): boolean => {
-    // Users can book available slots
+    // Users can book available slots (but not held slots)
     if (!isManager && slot.status === "AVAILABLE") {
+      return true;
+    }
+
+    // Managers can unblock blocked slots
+    if (isManager && slot.status === "BLOCKED") {
       return true;
     }
 
@@ -371,6 +392,63 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   };
 
   // ============================================================================
+  // Manager Block/Unblock Slots
+  // ============================================================================
+
+  const handleOpenBlockDialog = (slot: ReconstructedSlot) => {
+    setSelectedSlot(slot);
+    setBlockReason("");
+    setBlockDialogOpen(true);
+  };
+
+  const handleBlockSlot = async () => {
+    if (!selectedSlot || !user) return;
+
+    setIsProcessing(true);
+
+    try {
+      await blockSlot(
+        groundId,
+        selectedSlot.date,
+        selectedSlot.startTime,
+        blockReason.trim() || undefined,
+        user.uid
+      );
+      toast.success("Slot blocked successfully");
+      await loadSlots();
+      setBlockDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error blocking slot:", error);
+      toast.error(error.message || "Failed to block slot");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUnblockSlot = async (slot: ReconstructedSlot) => {
+    if (!isManager || slot.status !== "BLOCKED") {
+      return;
+    }
+
+    if (!confirm("Unblock this slot?")) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      await unblockSlot(groundId, slot.date, slot.startTime);
+      toast.success("Slot unblocked successfully");
+      await loadSlots();
+    } catch (error: any) {
+      console.error("Error unblocking slot:", error);
+      toast.error(error.message || "Failed to unblock slot");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // ============================================================================
   // Slot Styling
   // ============================================================================
 
@@ -522,25 +600,33 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
       </div>
 
       {/* Legend */}
-      <div className="flex gap-4 text-xs flex-wrap">
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-          <span>Available</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
-          <span>Booked (Website)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-purple-100 border border-purple-300 rounded flex items-center justify-center">
-            <Store className="w-2 h-2 text-purple-800" />
+      <div className="flex gap-4 text-xs flex-wrap items-center justify-between">
+        <div className="flex gap-4 flex-wrap">
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+            <span>Available</span>
           </div>
-          <span>Booked (Physical)</span>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
+            <span>Booked (Website)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-purple-100 border border-purple-300 rounded flex items-center justify-center">
+              <Store className="w-2 h-2 text-purple-800" />
+            </div>
+            <span>Booked (Physical)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+            <span>Blocked</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-          <span>Blocked</span>
-        </div>
+        
+        {isManager && (
+          <div className="text-sm text-muted-foreground">
+            <p>Click available slot to book • Click blocked to unblock • Right-click for options</p>
+          </div>
+        )}
       </div>
 
       {/* Slots Grid */}
@@ -562,12 +648,26 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
                   </div>
                 ) : (
                   dateSlots.map((slot, idx) => (
-                    <div
-                      key={`${slot.date}_${slot.startTime}`}
-                      className={getSlotClassName(slot)}
-                      onClick={() => canClickSlot(slot) && handleSlotClick(slot)}
-                    >
-                      {getSlotContent(slot)}
+                    <div key={`${slot.date}_${slot.startTime}`} className="relative group">
+                      <div
+                        className={getSlotClassName(slot)}
+                        onClick={() => canClickSlot(slot) && handleSlotClick(slot)}
+                      >
+                        {getSlotContent(slot)}
+                      </div>
+                      {/* Manager block button on hover for available slots */}
+                      {isManager && slot.status === "AVAILABLE" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenBlockDialog(slot);
+                          }}
+                          className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white text-xs px-1 rounded-bl"
+                          title="Block slot"
+                        >
+                          Block
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -661,6 +761,53 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
             >
               {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Block Slot Dialog */}
+      <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Block Slot</DialogTitle>
+            <DialogDescription>
+              {selectedSlot && (
+                <>
+                  Block slot on {formatDate(new Date(selectedSlot.date))} at {selectedSlot.startTime}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="blockReason">Reason (Optional)</Label>
+              <Textarea
+                id="blockReason"
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="e.g., Maintenance, Private event"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBlockDialogOpen(false)}
+              disabled={isProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBlockSlot}
+              disabled={isProcessing}
+            >
+              {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Block Slot
             </Button>
           </DialogFooter>
         </DialogContent>
