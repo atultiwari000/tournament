@@ -54,7 +54,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const UserBookingsPage = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -66,6 +66,9 @@ const UserBookingsPage = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Wait for auth to load before checking user
+    if (authLoading) return;
+    
     if (!user) {
       router.push("/login");
       return;
@@ -121,6 +124,56 @@ const UserBookingsPage = () => {
           return expired || booking;
         });
 
+        // Auto-verify pending payments that might have completed
+        const pendingBookings = updatedBookingsData.filter((b) => {
+          const statusLower = b.status.toLowerCase();
+          return statusLower === "pending_payment" && !b.holdExpiresAt; // No hold expiry means payment was initiated
+        });
+
+        if (pendingBookings.length > 0) {
+          console.log("🔍 Auto-verifying pending payments:", pendingBookings.length);
+          
+          const verifyPromises = pendingBookings.map(async (booking) => {
+            try {
+              const verifyResponse = await fetch("/api/payment/verify", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  transactionUuid: booking.id,
+                  productCode: "EPAYTEST",
+                  totalAmount: booking.amount || booking.price || 0,
+                }),
+              });
+
+              const verificationData = await verifyResponse.json();
+              
+              if (verificationData.verified && verificationData.status === "COMPLETE") {
+                console.log("✅ Auto-verified booking:", booking.id);
+                return { ...booking, status: "confirmed" };
+              }
+              
+              return booking;
+            } catch (error) {
+              console.error("Error auto-verifying booking:", booking.id, error);
+              return booking;
+            }
+          });
+
+          const verifiedResults = await Promise.all(verifyPromises);
+          
+          // Update bookings with verified status
+          const finalBookingsData = updatedBookingsData.map((booking) => {
+            const verified = verifiedResults.find((v) => v.id === booking.id);
+            return verified || booking;
+          });
+
+          setBookings(finalBookingsData);
+        } else {
+          setBookings(updatedBookingsData);
+        }
+
         // Fetch venue details for each booking
         const venueIds = [...new Set(updatedBookingsData.map((b) => b.venueId))];
         const venuePromises = venueIds.map((id) =>
@@ -132,7 +185,6 @@ const UserBookingsPage = () => {
           return acc;
         }, {});
 
-        setBookings(updatedBookingsData);
         setVenues(venuesMap);
       } catch (error) {
         console.error("Failed to fetch bookings:", error);
@@ -143,7 +195,94 @@ const UserBookingsPage = () => {
     };
 
     fetchBookings();
-  }, [user, router]);
+  }, [user, router, authLoading]);
+
+  // Periodic check for expired holds and pending payments (every 30 seconds)
+  useEffect(() => {
+    if (!user || authLoading || loading) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const now = Timestamp.now();
+        let hasChanges = false;
+
+        // Check for expired holds
+        const expiredBookings = bookings.filter((b) => {
+          const statusLower = (b.status || "").toLowerCase();
+          if (statusLower === "pending_payment" && b.holdExpiresAt) {
+            return b.holdExpiresAt.seconds < now.seconds;
+          }
+          return false;
+        });
+
+        if (expiredBookings.length > 0) {
+          console.log("⏰ Found expired holds:", expiredBookings.length);
+          for (const booking of expiredBookings) {
+            try {
+              const bookingRef = doc(db, "bookings", booking.id);
+              await updateDoc(bookingRef, {
+                status: "expired",
+                expiredAt: serverTimestamp(),
+              });
+              await releaseHold(booking.venueId, booking.date, booking.startTime);
+              hasChanges = true;
+            } catch (error) {
+              console.error("Error expiring booking:", error);
+            }
+          }
+        }
+
+        // Auto-verify pending payments
+        const pendingPayments = bookings.filter((b) => {
+          const statusLower = (b.status || "").toLowerCase();
+          return statusLower === "pending_payment" && !b.holdExpiresAt;
+        });
+
+        if (pendingPayments.length > 0) {
+          console.log("🔍 Checking pending payments:", pendingPayments.length);
+          for (const booking of pendingPayments) {
+            try {
+              const verifyResponse = await fetch("/api/payment/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  transactionUuid: booking.id,
+                  productCode: "EPAYTEST",
+                  totalAmount: booking.amount || booking.price || 0,
+                }),
+              });
+              const data = await verifyResponse.json();
+              if (data.verified && data.status === "COMPLETE") {
+                console.log("✅ Payment verified in background:", booking.id);
+                hasChanges = true;
+              }
+            } catch (error) {
+              console.error("Error verifying payment:", error);
+            }
+          }
+        }
+
+        // Refresh bookings if any changes detected
+        if (hasChanges) {
+          const q = query(
+            collection(db, "bookings"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc")
+          );
+          const querySnapshot = await getDocs(q);
+          const bookingsData = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setBookings(bookingsData);
+        }
+      } catch (error) {
+        console.error("Background check error:", error);
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [user, authLoading, loading, bookings]);
 
   const handleCancelBooking = async (booking: any) => {
     setCancellingId(booking.id);
@@ -305,12 +444,15 @@ const UserBookingsPage = () => {
     }
   };
 
-  if (loading) {
+  // Show loading while auth is being checked
+  if (authLoading || loading) {
     return (
       <div className="container mx-auto p-4 flex justify-center items-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="animate-spin h-8 w-8 text-primary" />
-          <p className="text-muted-foreground">Loading your bookings...</p>
+          <p className="text-muted-foreground">
+            {authLoading ? "Checking authentication..." : "Loading your bookings..."}
+          </p>
         </div>
       </div>
     );
