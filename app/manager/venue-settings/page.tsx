@@ -9,34 +9,17 @@ import {
   where,
   getDocs,
   doc,
-  updateDoc,
-  DocumentData,
+  getDoc,
 } from "firebase/firestore";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { NoVenueAccess } from "@/components/manager/NoVenueAccess";
+import ManagerPanel from "@/components/ManagerPanel";
 
-const VenueSettingsPage = () => {
+const MyVenuesPage = () => {
   const { user } = useAuth();
-  const [venue, setVenue] = useState<DocumentData | null>(null);
+  const [venue, setVenue] = useState<any | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    address: "",
-    price: "",
-  });
   const [loading, setLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [hasVenueAccess, setHasVenueAccess] = useState<boolean | null>(null);
 
   const fetchVenueDetails = useCallback(async () => {
@@ -45,9 +28,72 @@ const VenueSettingsPage = () => {
     try {
       const venuesQuery = query(
         collection(db, "venues"),
-        where("managedBy", "==", user.uid),
+        where("managedBy", "==", user.uid)
       );
       const venueSnapshot = await getDocs(venuesQuery);
+
+      if (venueSnapshot.empty) {
+        setHasVenueAccess(false);
+        setLoading(false);
+        return;
+      }
+
+      setHasVenueAccess(true);
+      const venueDoc = venueSnapshot.docs[0];
+      const fetchedVenueId = venueDoc.id;
+      setVenueId(fetchedVenueId);
+
+      // Fetch the full venue data
+      const venueRef = doc(db, "venues", fetchedVenueId);
+      const venueDocSnap = await getDoc(venueRef);
+      
+      if (venueDocSnap.exists()) {
+        setVenue({ id: fetchedVenueId, ...venueDocSnap.data() });
+      }
+    } catch (error) {
+      console.error("Error fetching venue details:", error);
+      setHasVenueAccess(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchVenueDetails();
+  }, [fetchVenueDetails]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+      </div>
+    );
+  }
+
+  if (hasVenueAccess === false) {
+    return <NoVenueAccess />;
+  }
+
+  if (!venue) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-gray-600">Loading venue data...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">My Venue</h1>
+        <p className="text-gray-600 mt-1">Manage your venue details, images, location, and availability.</p>
+      </div>
+      <ManagerPanel venue={venue} />
+    </div>
+  );
+};
+
+export default MyVenuesPage;
 
       if (venueSnapshot.empty) {
         setHasVenueAccess(false);
