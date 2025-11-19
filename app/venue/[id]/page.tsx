@@ -1,85 +1,42 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { Metadata } from "next";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/contexts/AuthContext";
-import { useParams } from "next/navigation";
-import { Skeleton } from "@/components/ui/skeleton";
-import ManagerPanel from "@/components/ManagerPanel";
-import UserPanel from "@/components/UserPanel";
+import VenueClient from "./VenueClient";
 
-const VenuePage = () => {
-  const { id } = useParams();
-  const [venue, setVenue] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { user, role } = useAuth();
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    const fetchVenue = async () => {
-      try {
-        setIsLoading(true);
-        const docRef = doc(db, "venues", id as string);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const venueData = { id: docSnap.id, ...docSnap.data() };
-          setVenue(venueData);
-        } else {
-          setError("Venue not found");
-        }
-      } catch (err) {
-        console.error("Error fetching venue:", err);
-        setError("Failed to load venue");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchVenue();
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  
+  try {
+    const docRef = doc(db, "venues", id);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const venue = docSnap.data();
+      return {
+        title: venue.name,
+        description: venue.description || `Book ${venue.name} on Fursal`,
+        openGraph: {
+          title: venue.name,
+          description: venue.description || `Book ${venue.name} on Fursal`,
+          images: venue.images?.[0] ? [venue.images[0]] : [],
+        },
+      };
     }
-  }, [id]);
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <Skeleton className="h-96 w-full rounded-lg" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Skeleton className="lg:col-span-2 h-64 rounded-lg" />
-            <Skeleton className="h-64 rounded-lg" />
-          </div>
-        </div>
-      </div>
-    );
+  } catch (error) {
+    console.error("Error generating metadata:", error);
   }
 
-  if (error || !venue) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {error || "Venue not found"}
-          </h1>
-          <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
-        </div>
-      </div>
-    );
-  }
+  return {
+    title: "Venue Details",
+    description: "View venue details and book your slot.",
+  };
+}
 
-  const isManagerOfVenue =
-    user && role === "manager" && venue.managedBy === user.uid;
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {isManagerOfVenue ? (
-        <ManagerPanel venue={venue} />
-      ) : (
-        <UserPanel venue={venue} />
-      )}
-    </div>
-  );
-};
-
-export default VenuePage;
+export default async function VenuePage({ params }: Props) {
+  const { id } = await params;
+  return <VenueClient id={id} />;
+}
