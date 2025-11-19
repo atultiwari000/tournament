@@ -178,10 +178,7 @@ const ManagerDashboardPage = () => {
             <Store className="mr-2 h-4 w-4" />
             View Venue
           </Button>
-          <Button onClick={() => router.push("/manager/calendar")}>
-            <Calendar className="mr-2 h-4 w-4" />
-            Manage Calendar
-          </Button>
+          
         </div>
       </div>
 
@@ -316,7 +313,7 @@ const ManagerDashboardPage = () => {
             <CardDescription>Manage your venue efficiently</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <Button 
+            {/* <Button 
               className="w-full justify-start h-auto py-4" 
               variant="outline"
               onClick={() => router.push("/manager/calendar")}
@@ -328,12 +325,12 @@ const ManagerDashboardPage = () => {
                 <div className="font-semibold">Manage Calendar</div>
                 <div className="text-xs text-muted-foreground">Block slots or add physical bookings</div>
               </div>
-            </Button>
+            </Button> */}
             
             <Button 
               className="w-full justify-start h-auto py-4" 
               variant="outline"
-              onClick={() => router.push(`/venue/${venueId}/edit`)}
+              onClick={() => router.push(`/manager/venue-settings`)}
             >
               <div className="bg-primary/10 p-2 rounded-full mr-4">
                 <Settings className="h-5 w-5 text-primary" />
