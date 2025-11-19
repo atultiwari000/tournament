@@ -10,6 +10,7 @@ import {
   doc,
   setDoc,
   serverTimestamp,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -85,40 +86,68 @@ const ReviewsSection = ({ venueId }: ReviewsSectionProps) => {
 
     try {
       setIsSubmitting(true);
-      const commentData = {
-        text: newComment,
-        author: user.displayName || user.email || "Anonymous",
-        role: role || "user",
-        rating: rating,
-        createdAt: new Date().toISOString(),
-      };
+      
+      await runTransaction(db, async (transaction) => {
+        // 1. Create references
+        const venueRef = doc(db, "venues", venueId);
+        const commentRef = doc(collection(db, `venues/${venueId}/comments`));
+        const reviewRef = doc(db, "reviews", `${venueId}_${user.uid}`);
 
-      const commentDocRef = await addDoc(
-        collection(db, `venues/${venueId}/comments`),
-        commentData
-      );
+        // 2. Read current venue data
+        const venueDoc = await transaction.get(venueRef);
+        if (!venueDoc.exists()) {
+          throw "Venue does not exist!";
+        }
 
-      setComments([{ id: commentDocRef.id, ...commentData }, ...comments]);
-      setNewComment("");
-      setRating(0);
-      setHoverRating(0);
+        const venueData = venueDoc.data();
+        const currentRating = venueData.averageRating || 0;
+        const currentCount = venueData.reviewCount || 0;
 
-      // Also store in reviews collection for aggregation
-      const reviewDocRef = doc(db, "reviews", `${venueId}_${user.uid}`);
-      await setDoc(
-        reviewDocRef,
-        {
+        // 3. Calculate new stats
+        // New Average = ((Old Average * Old Count) + New Rating) / (Old Count + 1)
+        const newCount = currentCount + 1;
+        const newAverage = ((currentRating * currentCount) + rating) / newCount;
+        const roundedAverage = Math.round(newAverage * 10) / 10;
+
+        // 4. Prepare data
+        const commentData = {
+          text: newComment,
+          author: user.displayName || user.email || "Anonymous",
+          role: role || "user",
+          rating: rating,
+          createdAt: new Date().toISOString(),
+        };
+
+        const reviewData = {
           venueId: venueId,
           userId: user.uid,
           rating: rating,
           comment: newComment,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+        };
 
+        // 5. Perform writes
+        transaction.set(commentRef, commentData);
+        transaction.set(reviewRef, reviewData, { merge: true });
+        transaction.update(venueRef, {
+          averageRating: roundedAverage,
+          reviewCount: newCount,
+        });
+
+        // Update local state (optimistic UI update not strictly needed since we refetch or just append)
+        // We'll just append to the local list for immediate feedback
+        setComments((prev) => [{ id: commentRef.id, ...commentData }, ...prev]);
+      });
+
+      setNewComment("");
+      setRating(0);
+      setHoverRating(0);
       toast.success("Review posted successfully");
+      
+      // Optional: Trigger a refresh of the venue data in the parent component if needed
+      // For now, the user will see the updated comment list immediately.
+      
     } catch (error) {
       console.error("Error adding comment:", error);
       toast.error("Failed to add review");

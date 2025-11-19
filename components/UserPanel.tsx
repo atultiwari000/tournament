@@ -18,7 +18,12 @@ import VenueDetails from "@/components/VenueDetails";
 import ReviewsSection from "@/components/ReviewsSection";
 import WeeklySlotsGrid from "@/components/WeeklySlotsGrid";
 import RatingModal from "@/components/RatingModal";
-import VenueLocationMap from "@/components/VenueLocationMap";
+import dynamic from "next/dynamic";
+
+const VenueLocationMap = dynamic(
+  () => import("@/components/VenueLocationMap"),
+  { ssr: false }
+);
 import { useState, useEffect } from "react";
 import {
   collection,
@@ -125,12 +130,14 @@ const UserPanel = ({ venue }: UserPanelProps) => {
 
           {/* Right: Header, Booking, Quick Info */}
           <div className="space-y-8">
-            <VenueHeader
-              venueId={id as string}
-              name={venue.name}
-              pricePerHour={venue.pricePerHour}
-              address={venue.address}
-            />
+              <VenueHeader
+                venueId={id as string}
+                name={venue.name}
+                pricePerHour={venue.pricePerHour}
+                address={venue.address}
+                averageRating={venue.averageRating}
+                reviewCount={venue.reviewCount}
+              />
 
             {/* Booking Section - Enhanced */}
             <Card className="shadow-xl border-0 ring-1 ring-gray-200 overflow-hidden bg-white">

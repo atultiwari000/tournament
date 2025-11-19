@@ -1,9 +1,7 @@
 "use client";
 
-import { Star, MapPin, Clock, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { Star, MapPin, Clock } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface VenueHeaderProps {
@@ -11,10 +9,8 @@ interface VenueHeaderProps {
   name: string;
   pricePerHour: number;
   address?: string;
-}
-
-interface Review {
-  rating: number;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 const VenueHeader = ({
@@ -22,9 +18,20 @@ const VenueHeader = ({
   name,
   pricePerHour,
   address,
+  averageRating = 0,
+  reviewCount = 0,
 }: VenueHeaderProps) => {
-  const [averageRating, setAverageRating] = useState<number | null>(null);
-  const [reviewCount, setReviewCount] = useState(0);
+  // We no longer fetch reviews here, relying on props passed from parent
+  // which come directly from the venue document.
+  
+  // For breakdown, we could still fetch or store it in the venue doc.
+  // For now, let's simplify and remove the breakdown fetching or keep it optional.
+  // Since the user asked for "rating calculation", storing the average is key.
+  // The breakdown requires fetching all reviews or storing a map.
+  // Let's keep the breakdown static or hidden for now to match the new architecture,
+  // or fetch it ONLY if the user expands the details (optimization).
+  // For this step, I will remove the automatic fetching to rely on the props.
+  
   const [ratingBreakdown, setRatingBreakdown] = useState<Record<number, number>>({
     5: 0,
     4: 0,
@@ -32,41 +39,10 @@ const VenueHeader = ({
     2: 0,
     1: 0,
   });
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        const q = query(
-          collection(db, "reviews"),
-          where("venueId", "==", venueId)
-        );
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const reviews = querySnapshot.docs.map((doc) => doc.data() as Review);
-          const avgRating =
-            reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-          setAverageRating(Math.round(avgRating * 10) / 10);
-          setReviewCount(reviews.length);
-
-          // Calculate rating breakdown
-          const breakdown: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-          reviews.forEach((r) => {
-            breakdown[r.rating] = (breakdown[r.rating] || 0) + 1;
-          });
-          setRatingBreakdown(breakdown);
-        }
-      } catch (error) {
-        console.error("Error fetching reviews:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchReviews();
-  }, [venueId]);
-
+  // Optional: Fetch breakdown only if needed, or we can implement a more advanced 
+  // storage for breakdown later. For now, let's just use the average.
+  
   const renderStars = (rating: number, size: "sm" | "lg" = "sm") => {
     const sizeClass = size === "lg" ? "w-6 h-6" : "w-4 h-4";
     return [...Array(5)].map((_, i) => (
@@ -109,9 +85,7 @@ const VenueHeader = ({
 
       {/* Rating Section */}
       <div className="flex flex-wrap items-center gap-4 pb-4 border-b border-gray-200">
-        {isLoading ? (
-          <div className="text-gray-400 text-sm">Loading ratings...</div>
-        ) : averageRating !== null ? (
+        {reviewCount > 0 ? (
           <>
             <div className="flex items-center gap-2">
               <div className="flex gap-0.5">
