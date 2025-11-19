@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Star, Map, List, MapPin } from "lucide-react";
+import { Star, Map, List, MapPin, Filter } from "lucide-react";
 import dynamic from "next/dynamic";
 import { LocationPermissionBanner } from "@/components/LocationPermissionBanner";
 
@@ -23,9 +23,33 @@ const PublicVenueMap = dynamic(() => import("@/components/PublicVenueMap"), {
 
 const VenueFilter = ({ setFilteredVenues, allVenues }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Temporary filter values (before applying)
+  const [tempMinRating, setTempMinRating] = useState(0);
+  const [tempMinPrice, setTempMinPrice] = useState("");
+  const [tempMaxPrice, setTempMaxPrice] = useState("");
+  
+  // Applied filter values (after clicking Apply)
   const [minRating, setMinRating] = useState(0);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+
+  const applyFilters = () => {
+    setMinRating(tempMinRating);
+    setMinPrice(tempMinPrice);
+    setMaxPrice(tempMaxPrice);
+    setShowFilters(false);
+  };
+
+  const clearFilters = () => {
+    setTempMinRating(0);
+    setTempMinPrice("");
+    setTempMaxPrice("");
+    setMinRating(0);
+    setMinPrice("");
+    setMaxPrice("");
+  };
 
   useEffect(() => {
     let filtered = allVenues;
@@ -58,76 +82,134 @@ const VenueFilter = ({ setFilteredVenues, allVenues }) => {
   }, [searchTerm, minRating, minPrice, maxPrice, allVenues, setFilteredVenues]);
 
   return (
-    <div className="p-4 border rounded-lg space-y-4 bg-background">
-      <h3 className="text-lg font-semibold">Filter Venues</h3>
-      <Input
-        placeholder="Search by name..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Minimum Rating:
-        </label>
-        <div className="flex items-center">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Star
-              key={star}
-              className={`cursor-pointer h-5 w-5 ${
-                minRating >= star
-                  ? "text-yellow-400 fill-yellow-400"
-                  : "text-gray-300"
-              }`}
-              onClick={() => setMinRating(star)}
-            />
-          ))}
+    <div className="space-y-3">
+      {/* Search Bar - Always Visible */}
+      <div className="flex gap-2">
+        <Input
+          placeholder="Search by name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+        />
+        <Button
+          variant={showFilters ? "default" : "outline"}
+          size="icon"
+          onClick={() => setShowFilters(!showFilters)}
+          title="Toggle filters"
+        >
+          <Filter className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Active Filters Indicator */}
+      {(minRating > 0 || minPrice !== "" || maxPrice !== "") && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium">Active filters:</span>
+          {minRating > 0 && (
+            <span className="bg-primary/10 text-primary px-2 py-1 rounded">
+              {minRating}+ stars
+            </span>
+          )}
+          {minPrice !== "" && (
+            <span className="bg-primary/10 text-primary px-2 py-1 rounded">
+              Min: Rs. {minPrice}
+            </span>
+          )}
+          {maxPrice !== "" && (
+            <span className="bg-primary/10 text-primary px-2 py-1 rounded">
+              Max: Rs. {maxPrice}
+            </span>
+          )}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setMinRating(0)}
-            className="ml-2"
+            onClick={clearFilters}
+            className="h-6 px-2 text-xs"
           >
-            Clear
+            Clear all
           </Button>
         </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Price Range (Rs./hour):
-        </label>
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            placeholder="Min"
-            value={minPrice}
-            onChange={(e) => setMinPrice(e.target.value)}
-            className="flex-1"
-            min="0"
-          />
-          <span className="text-muted-foreground">-</span>
-          <Input
-            type="number"
-            placeholder="Max"
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(e.target.value)}
-            className="flex-1"
-            min="0"
-          />
+      )}
+
+      {/* Collapsible Filter Panel */}
+      {showFilters && (
+        <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+          <h3 className="text-sm font-semibold">Advanced Filters</h3>
+          
+          {/* Rating Filter */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Minimum Rating:
+            </label>
+            <div className="flex items-center">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`cursor-pointer h-5 w-5 ${
+                    tempMinRating >= star
+                      ? "text-yellow-400 fill-yellow-400"
+                      : "text-gray-300"
+                  }`}
+                  onClick={() => setTempMinRating(star)}
+                />
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTempMinRating(0)}
+                className="ml-2"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+
+          {/* Price Range Filter */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Price Range (Rs./hour):
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="Min"
+                value={tempMinPrice}
+                onChange={(e) => setTempMinPrice(e.target.value)}
+                className="flex-1"
+                min="0"
+              />
+              <span className="text-muted-foreground">-</span>
+              <Input
+                type="number"
+                placeholder="Max"
+                value={tempMaxPrice}
+                onChange={(e) => setTempMaxPrice(e.target.value)}
+                className="flex-1"
+                min="0"
+              />
+            </div>
+          </div>
+
+          {/* Apply and Cancel Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Button
+              onClick={applyFilters}
+              className="flex-1"
+              size="sm"
+            >
+              Apply Filters
+            </Button>
+            <Button
+              onClick={() => setShowFilters(false)}
+              variant="outline"
+              className="flex-1"
+              size="sm"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
-        {(minPrice !== "" || maxPrice !== "") && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setMinPrice("");
-              setMaxPrice("");
-            }}
-            className="mt-2 text-xs"
-          >
-            Clear Price Filter
-          </Button>
-        )}
-      </div>
+      )}
     </div>
   );
 };
