@@ -27,33 +27,40 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Calendar, Settings, Users, Store, CreditCard, Plus } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { NoVenueAccess } from "@/components/manager/NoVenueAccess";
 
 const ManagerDashboardPage = () => {
   const { user } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalRevenue: 0,
     activeBookings: 0,
     pendingBookings: 0,
+    physicalBookings: 0,
+    onlineBookings: 0,
   });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasVenueAccess, setHasVenueAccess] = useState<boolean | null>(null);
+  const [venueId, setVenueId] = useState<string | null>(null);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "confirmed":
       case "CONFIRMED":
         return <Badge className="bg-green-500">Confirmed</Badge>;
+      case "pending_payment":
       case "PENDING_PAYMENT":
         return <Badge variant="secondary">Pending</Badge>;
+      case "cancelled":
       case "CANCELLED":
-        return <Badge variant="outline">Cancelled (User)</Badge>;
-      case "CANCELLED_BY_MANAGER":
-        return <Badge variant="destructive">Cancelled (Manager)</Badge>;
+        return <Badge variant="outline">Cancelled</Badge>;
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -77,6 +84,7 @@ const ManagerDashboardPage = () => {
 
       setHasVenueAccess(true);
       const managerVenueId = venueSnapshot.docs[0].id;
+      setVenueId(managerVenueId);
 
       const bookingsQuery = query(
         collection(db, "bookings"),
@@ -91,21 +99,43 @@ const ManagerDashboardPage = () => {
       let totalRevenue = 0;
       let activeBookings = 0;
       let pendingBookings = 0;
+      let physicalBookings = 0;
+      let onlineBookings = 0;
 
-      allBookings.forEach((booking) => {
-        if (booking.status === "CONFIRMED") {
-          totalRevenue += booking.price;
+      allBookings.forEach((booking: any) => {
+        const status = booking.status?.toLowerCase();
+        
+        if (status === "confirmed") {
+          // Only count revenue for online bookings or if amount is explicitly set
+          // Physical bookings usually have 0 amount in this system unless manually tracked
+          if (booking.amount) {
+            totalRevenue += Number(booking.amount);
+          }
           activeBookings++;
+
+          if (booking.bookingType === "physical") {
+            physicalBookings++;
+          } else {
+            onlineBookings++;
+          }
         }
-        if (booking.status === "PENDING_PAYMENT") {
+        
+        if (status === "pending_payment") {
           pendingBookings++;
         }
       });
 
-      setStats({ totalRevenue, activeBookings, pendingBookings });
+      setStats({ 
+        totalRevenue, 
+        activeBookings, 
+        pendingBookings,
+        physicalBookings,
+        onlineBookings
+      });
 
+      // Sort by date and time (descending)
       const sortedBookings = allBookings.sort(
-        (a, b) =>
+        (a: any, b: any) =>
           new Date(b.date + "T" + b.startTime).getTime() -
           new Date(a.date + "T" + a.startTime).getTime(),
       );
@@ -126,8 +156,8 @@ const ManagerDashboardPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin" /> Loading Dashboard...
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -137,88 +167,196 @@ const ManagerDashboardPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Manager Dashboard</h1>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your venue's performance</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => router.push(`/venue/${venueId}`)} variant="outline">
+            <Store className="mr-2 h-4 w-4" />
+            View Venue
+          </Button>
+          <Button onClick={() => router.push("/manager/calendar")}>
+            <Calendar className="mr-2 h-4 w-4" />
+            Manage Calendar
+          </Button>
+        </div>
+      </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Total Revenue</CardTitle>
-            <CardDescription>From all confirmed bookings</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              Rs. {stats.totalRevenue.toFixed(2)}
+            <div className="text-2xl font-bold">Rs. {stats.totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              From {stats.onlineBookings} online bookings
             </p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Active Bookings</CardTitle>
-            <CardDescription>Confirmed and paid bookings</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Bookings</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.activeBookings}</p>
+            <div className="text-2xl font-bold">{stats.activeBookings}</div>
             <p className="text-xs text-muted-foreground">
               {stats.pendingBookings} pending payment
             </p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Venue Rating</CardTitle>
-            <CardDescription>Customer satisfaction score</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Physical Bookings</CardTitle>
+            <Store className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">N/A</p>
+            <div className="text-2xl font-bold">{stats.physicalBookings}</div>
             <p className="text-xs text-muted-foreground">
-              Review system not yet implemented
+              Manual reservations
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Online Bookings</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.onlineBookings}</div>
+            <p className="text-xs text-muted-foreground">
+              Website reservations
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div>
-        <Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        {/* Recent Bookings */}
+        <Card className="col-span-4">
           <CardHeader className="flex flex-row items-center justify-between">
-            <div className="space-y-1">
+            <div>
               <CardTitle>Recent Bookings</CardTitle>
               <CardDescription>
-                A list of the 5 most recent bookings for your venue.
+                Latest booking activity for your venue.
               </CardDescription>
             </div>
-            <Link
-              href="/manager/bookings"
-              className="text-sm text-blue-500 hover:underline"
-            >
-              View All
-            </Link>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/manager/bookings">View All</Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {recentBookings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No recent bookings to display.
-              </p>
+              <div className="text-center py-8 text-muted-foreground">
+                No bookings found.
+              </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentBookings.map((b) => (
-                    <TableRow key={b.id}>
-                      <TableCell>{b.date}</TableCell>
-                      <TableCell>{b.startTime}</TableCell>
-                      <TableCell>{getStatusBadge(b.status)}</TableCell>
+                  {recentBookings.map((booking) => (
+                    <TableRow key={booking.id}>
+                      <TableCell className="font-medium">
+                        {booking.bookingType === "physical" ? (
+                          <div className="flex flex-col">
+                            <span>{booking.customerName || "Walk-in"}</span>
+                            <span className="text-xs text-muted-foreground">{booking.customerPhone}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span>Online User</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>{booking.date}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {booking.startTime} - {booking.endTime}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {booking.bookingType === "physical" ? (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Physical</Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Online</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                      <TableCell className="text-right">
+                        {booking.amount ? `Rs. ${booking.amount}` : "-"}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Manage your venue efficiently</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <Button 
+              className="w-full justify-start h-auto py-4" 
+              variant="outline"
+              onClick={() => router.push("/manager/calendar")}
+            >
+              <div className="bg-primary/10 p-2 rounded-full mr-4">
+                <Calendar className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <div className="font-semibold">Manage Calendar</div>
+                <div className="text-xs text-muted-foreground">Block slots or add physical bookings</div>
+              </div>
+            </Button>
+            
+            <Button 
+              className="w-full justify-start h-auto py-4" 
+              variant="outline"
+              onClick={() => router.push(`/venue/${venueId}/edit`)}
+            >
+              <div className="bg-primary/10 p-2 rounded-full mr-4">
+                <Settings className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <div className="font-semibold">Venue Settings</div>
+                <div className="text-xs text-muted-foreground">Update price, description, and amenities</div>
+              </div>
+            </Button>
+
+            <Button 
+              className="w-full justify-start h-auto py-4" 
+              variant="outline"
+              onClick={() => router.push("/manager/bookings")}
+            >
+              <div className="bg-primary/10 p-2 rounded-full mr-4">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <div className="font-semibold">All Bookings</div>
+                <div className="text-xs text-muted-foreground">View and manage all booking history</div>
+              </div>
+            </Button>
           </CardContent>
         </Card>
       </div>
