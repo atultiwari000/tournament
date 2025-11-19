@@ -39,7 +39,7 @@ const VenueFilter = ({ setFilteredVenues, allVenues }) => {
     }
 
     if (minRating > 0) {
-      filtered = filtered.filter((venue) => venue.avgRating >= minRating);
+      filtered = filtered.filter((venue) => (venue.averageRating || 0) >= minRating);
     }
 
     if (amenities.parking) {
@@ -140,23 +140,23 @@ const VenueResultList = ({ venues, setSelectedVenue }) => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">{venue.name}</CardTitle>
                 <div className="flex items-center pt-1">
-                  {venue.avgRating > 0 ? (
+                  {venue.averageRating > 0 ? (
                     <>
                       <div className="flex items-center">
-                        {[...Array(Math.floor(venue.avgRating))].map((_, i) => (
+                        {[...Array(Math.floor(venue.averageRating))].map((_, i) => (
                           <Star
                             key={i}
                             className="h-4 w-4 text-yellow-400 fill-yellow-400"
                           />
                         ))}
-                        {[...Array(5 - Math.floor(venue.avgRating))].map(
+                        {[...Array(5 - Math.floor(venue.averageRating))].map(
                           (_, i) => (
                             <Star key={i} className="h-4 w-4 text-gray-300" />
                           ),
                         )}
                       </div>
                       <span className="ml-2 text-xs text-muted-foreground">
-                        {venue.avgRating.toFixed(1)} ({venue.ratingCount}{" "}
+                        {venue.averageRating.toFixed(1)} ({venue.reviewCount}{" "}
                         reviews)
                       </span>
                     </>
@@ -231,23 +231,9 @@ const VenuesPage = () => {
   useEffect(() => {
     const fetchVenuesAndRatings = async () => {
       const venuesCollection = await getDocs(collection(db, "venues"));
-      const venuesData = await Promise.all(
-        venuesCollection.docs.map(async (doc) => {
-          const venue = { id: doc.id, ...doc.data() };
-          const ratingsQuery = query(
-            collection(db, `venues/${doc.id}/ratings`),
-          );
-          const ratingsSnapshot = await getDocs(ratingsQuery);
-          const ratings = ratingsSnapshot.docs.map(
-            (ratingDoc) => ratingDoc.data().rating,
-          );
-          const avgRating =
-            ratings.length > 0
-              ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-              : 0;
-          return { ...venue, avgRating, ratingCount: ratings.length };
-        }),
-      );
+      const venuesData = venuesCollection.docs.map((doc) => {
+        return { id: doc.id, ...doc.data() };
+      });
       setAllVenues(venuesData);
       setFilteredVenues(venuesData);
     };
