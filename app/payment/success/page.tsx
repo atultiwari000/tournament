@@ -9,10 +9,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Home, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { BookingSummary } from "@/components/BookingSummary";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
@@ -20,16 +23,37 @@ export default function PaymentSuccessPage() {
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
   const [message, setMessage] = useState("Verifying your payment...");
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [venueDetails, setVenueDetails] = useState<any>(null);
 
   useEffect(() => {
     verifyAndConfirmPayment();
   }, []);
 
+  const fetchBookingDetails = async (id: string) => {
+    try {
+      const bookingDoc = await getDoc(doc(db, "bookings", id));
+      if (bookingDoc.exists()) {
+        const data = bookingDoc.data();
+        setBookingDetails(data);
+        
+        // Fetch venue details too
+        if (data.venueId) {
+          const venueDoc = await getDoc(doc(db, "venues", data.venueId));
+          if (venueDoc.exists()) {
+            setVenueDetails(venueDoc.data());
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching booking details:", error);
+    }
+  };
+
   const verifyAndConfirmPayment = async () => {
     try {
       // Get eSewa response - they send Base64 encoded data in 'data' parameter
       const encodedData = searchParams.get("data");
-      console.log("📦 Encoded data:", encodedData);
       
       if (!encodedData) {
         setStatus("error");
@@ -41,9 +65,7 @@ export default function PaymentSuccessPage() {
       let responseData: any;
       try {
         const decodedString = atob(encodedData);
-        console.log("🔓 Decoded string:", decodedString);
         responseData = JSON.parse(decodedString);
-        console.log("📋 Parsed response data:", responseData);
       } catch (e) {
         console.error("❌ Error decoding eSewa response:", e);
         setStatus("error");
@@ -51,26 +73,19 @@ export default function PaymentSuccessPage() {
         return;
       }
 
-      // Extract transaction details from decoded data
+      // Extract transaction details
       const transactionUuid = responseData.transaction_uuid;
       const productCode = responseData.product_code;
-      const transactionCode = responseData.transaction_code;
       const esewaStatus = responseData.status;
       const totalAmount = responseData.total_amount;
-
-      console.log("🔍 Extracted data:", {
-        transactionUuid,
-        productCode,
-        transactionCode,
-        esewaStatus,
-        totalAmount,
-      });
 
       if (!transactionUuid || !productCode) {
         setStatus("error");
         setMessage("Invalid payment response. Missing transaction details.");
         return;
       }
+
+      setBookingId(transactionUuid);
 
       // Check if eSewa reported success
       if (esewaStatus !== "COMPLETE") {
@@ -79,9 +94,6 @@ export default function PaymentSuccessPage() {
         return;
       }
 
-      setBookingId(transactionUuid);
-
-      console.log("🔐 Verifying payment with eSewa API...");
       // Verify payment with eSewa
       const verifyResponse = await fetch("/api/payment/verify", {
         method: "POST",
@@ -91,15 +103,13 @@ export default function PaymentSuccessPage() {
         body: JSON.stringify({
           transactionUuid,
           productCode,
-          totalAmount, // Pass the total amount for verification
+          totalAmount,
         }),
       });
 
       const verificationData = await verifyResponse.json();
-      console.log("✅ Verification response:", verificationData);
 
       if (!verificationData.verified || verificationData.status !== "COMPLETE") {
-        console.warn("⚠️ Verification failed:", verificationData);
         setStatus("error");
         setMessage(
           `Payment verification failed. Status: ${verificationData.status || "Unknown"}`
@@ -107,22 +117,13 @@ export default function PaymentSuccessPage() {
         return;
       }
 
-      // Check if booking was confirmed by the server
-      if (verificationData.bookingConfirmed || verificationData.alreadyConfirmed) {
-        console.log("✅ Booking confirmed by server");
-        setStatus("success");
-        setMessage("Payment successful! Your booking has been confirmed.");
-      } else if (verificationData.error) {
-        console.error("⚠️ Server error:", verificationData.error);
-        setStatus("error");
-        setMessage(
-          "Payment verified but booking confirmation failed. Please contact support with your transaction ID."
-        );
-      } else {
-        console.log("🎉 Payment verification complete!");
-        setStatus("success");
-        setMessage("Payment successful! Your booking has been confirmed.");
-      }
+      // Success!
+      setStatus("success");
+      setMessage("Payment successful! Your booking has been confirmed.");
+      
+      // Fetch details for the summary card
+      await fetchBookingDetails(transactionUuid);
+
     } catch (error) {
       console.error("❌ Error verifying payment:", error);
       setStatus("error");
@@ -131,59 +132,103 @@ export default function PaymentSuccessPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16 max-w-2xl">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg shadow-xl border-0">
+        <CardHeader className="text-center pb-2">
+          <div className="flex justify-center mb-6">
             {status === "verifying" && (
-              <Loader2 className="h-16 w-16 animate-spin text-blue-500" />
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
+                <div className="relative bg-blue-50 p-4 rounded-full">
+                  <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+                </div>
+              </div>
             )}
             {status === "success" && (
-              <CheckCircle2 className="h-16 w-16 text-green-500" />
+              <div className="relative">
+                <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-20"></div>
+                <div className="relative bg-green-50 p-4 rounded-full">
+                  <CheckCircle2 className="h-12 w-12 text-green-600" />
+                </div>
+              </div>
             )}
-            {status === "error" && <XCircle className="h-16 w-16 text-red-500" />}
+            {status === "error" && (
+              <div className="bg-red-50 p-4 rounded-full">
+                <XCircle className="h-12 w-12 text-red-600" />
+              </div>
+            )}
           </div>
-          <CardTitle className="text-2xl">
-            {status === "verifying" && "Processing Payment"}
-            {status === "success" && "Payment Successful!"}
+          
+          <CardTitle className="text-2xl font-bold text-gray-900">
+            {status === "verifying" && "Verifying Payment"}
+            {status === "success" && "Booking Confirmed!"}
             {status === "error" && "Payment Failed"}
           </CardTitle>
-          <CardDescription>{message}</CardDescription>
+          
+          <p className="text-muted-foreground mt-2">
+            {message}
+          </p>
         </CardHeader>
-        <CardContent className="space-y-4">
+
+        <CardContent className="space-y-6 pt-6">
+          {status === "success" && bookingDetails && venueDetails && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <BookingSummary
+                venueName={venueDetails.name}
+                address={venueDetails.address}
+                date={bookingDetails.date}
+                startTime={bookingDetails.startTime}
+                endTime={bookingDetails.endTime}
+                price={bookingDetails.amount}
+                className="bg-white shadow-sm border-gray-200"
+              />
+            </div>
+          )}
+
           {status === "success" && (
-            <>
-              <Alert className="bg-green-50 border-green-200">
-                <AlertDescription>
-                  Your booking has been confirmed. You will receive a confirmation email shortly.
-                </AlertDescription>
-              </Alert>
-              <div className="flex gap-3 justify-center">
-                <Button onClick={() => router.push(`/user/bookings?highlight=${bookingId}`)}>
-                  View My Bookings
-                </Button>
-                <Button variant="outline" onClick={() => router.push("/venues")}>
-                  Browse More Venues
-                </Button>
-              </div>
-            </>
+            <div className="flex flex-col gap-3 pt-2">
+              <Button 
+                className="w-full h-12 text-lg" 
+                onClick={() => router.push(`/user/bookings?highlight=${bookingId}`)}
+              >
+                <Calendar className="w-5 h-5 mr-2" />
+                View My Bookings
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full h-12"
+                onClick={() => router.push("/venues")}
+              >
+                <Home className="w-5 h-5 mr-2" />
+                Back to Home
+              </Button>
+            </div>
           )}
 
           {status === "error" && (
-            <div className="flex gap-3 justify-center">
-              <Button onClick={() => router.push(`/payment/${bookingId}`)}>
-                Try Again
-              </Button>
-              <Button variant="outline" onClick={() => router.push("/user/bookings")}>
-                My Bookings
+            <div className="flex flex-col gap-3 pt-2">
+              {bookingId && (
+                <Button 
+                  className="w-full h-12 text-lg"
+                  onClick={() => router.push(`/payment/${bookingId}`)}
+                >
+                  Try Payment Again
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                className="w-full h-12"
+                onClick={() => router.push("/user/bookings")}
+              >
+                Go to My Bookings
               </Button>
             </div>
           )}
 
           {status === "verifying" && (
-            <Alert>
-              <AlertDescription>
-                Please wait while we verify your payment with eSewa. This may take a few moments.
+            <Alert className="bg-blue-50 border-blue-200 text-blue-800">
+              <AlertDescription className="text-center">
+                Please do not close this window. We are confirming your transaction with eSewa.
               </AlertDescription>
             </Alert>
           )}

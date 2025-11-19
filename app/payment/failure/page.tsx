@@ -8,9 +8,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { XCircle, AlertTriangle } from "lucide-react";
+import { XCircle, AlertTriangle, RefreshCw, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function PaymentFailurePage() {
@@ -38,44 +38,55 @@ export default function PaymentFailurePage() {
   }, [searchParams]);
 
   return (
-    <div className="container mx-auto px-4 py-16 max-w-2xl">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <XCircle className="h-16 w-16 text-red-500" />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg shadow-xl border-0">
+        <CardHeader className="text-center pb-2">
+          <div className="flex justify-center mb-6">
+            <div className="bg-red-50 p-4 rounded-full">
+              <XCircle className="h-12 w-12 text-red-600" />
+            </div>
           </div>
-          <CardTitle className="text-2xl">Payment Failed</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold text-gray-900">Payment Failed</CardTitle>
+          <p className="text-muted-foreground mt-2">
             Your payment could not be processed or was cancelled.
-          </CardDescription>
+          </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
+
+        <CardContent className="space-y-6 pt-6">
+          <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
+            <AlertTriangle className="h-4 w-4 text-red-800" />
             <AlertDescription>
-              Your booking hold is still active for a limited time. You can try again before it
-              expires.
+              Your booking hold is still active for a limited time. You can try again before it expires.
             </AlertDescription>
           </Alert>
 
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>Common reasons for payment failure:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+            <p className="text-sm font-medium text-gray-900 mb-2">Common reasons for failure:</p>
+            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-1">
               <li>Payment was cancelled by you</li>
               <li>Insufficient balance in eSewa account</li>
               <li>Network connectivity issues</li>
-              <li>Invalid payment credentials</li>
+              <li>Session timeout</li>
             </ul>
           </div>
 
-          <div className="flex gap-3 justify-center pt-4">
+          <div className="flex flex-col gap-3 pt-2">
             {transactionUuid && (
-              <Button onClick={() => router.push(`/payment/${transactionUuid}`)}>
+              <Button 
+                className="w-full h-12 text-lg"
+                onClick={() => router.push(`/payment/${transactionUuid}`)}
+              >
+                <RefreshCw className="w-5 h-5 mr-2" />
                 Try Payment Again
               </Button>
             )}
-            <Button variant="outline" onClick={() => router.push("/venues")}>
-              Browse Venues
+            <Button 
+              variant="outline" 
+              className="w-full h-12"
+              onClick={() => router.push("/venues")}
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Browse Other Venues
             </Button>
           </div>
 
