@@ -24,6 +24,8 @@ const PublicVenueMap = dynamic(() => import("@/components/PublicVenueMap"), {
 const VenueFilter = ({ setFilteredVenues, allVenues }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [minRating, setMinRating] = useState(0);
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
   const [amenities, setAmenities] = useState({
     parking: false,
     covered: false,
@@ -42,6 +44,20 @@ const VenueFilter = ({ setFilteredVenues, allVenues }) => {
       filtered = filtered.filter((venue) => (venue.averageRating || 0) >= minRating);
     }
 
+    if (minPrice !== "") {
+      const min = parseFloat(minPrice);
+      if (!isNaN(min)) {
+        filtered = filtered.filter((venue) => (venue.pricePerHour || 0) >= min);
+      }
+    }
+
+    if (maxPrice !== "") {
+      const max = parseFloat(maxPrice);
+      if (!isNaN(max)) {
+        filtered = filtered.filter((venue) => (venue.pricePerHour || 0) <= max);
+      }
+    }
+
     if (amenities.parking) {
       filtered = filtered.filter((venue) => venue.amenities?.parking);
     }
@@ -51,7 +67,7 @@ const VenueFilter = ({ setFilteredVenues, allVenues }) => {
     }
 
     setFilteredVenues(filtered);
-  }, [searchTerm, minRating, amenities, allVenues, setFilteredVenues]);
+  }, [searchTerm, minRating, minPrice, maxPrice, amenities, allVenues, setFilteredVenues]);
 
   return (
     <div className="p-4 border rounded-lg space-y-4 bg-background">
@@ -86,6 +102,43 @@ const VenueFilter = ({ setFilteredVenues, allVenues }) => {
             Clear
           </Button>
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Price Range (Rs./hour):
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            placeholder="Min"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            className="flex-1"
+            min="0"
+          />
+          <span className="text-muted-foreground">-</span>
+          <Input
+            type="number"
+            placeholder="Max"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            className="flex-1"
+            min="0"
+          />
+        </div>
+        {(minPrice !== "" || maxPrice !== "") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setMinPrice("");
+              setMaxPrice("");
+            }}
+            className="mt-2 text-xs"
+          >
+            Clear Price Filter
+          </Button>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium mb-2">Amenities:</label>
