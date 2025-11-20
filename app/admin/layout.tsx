@@ -41,6 +41,7 @@ const NAV_ITEMS = [
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
   { label: "Venues", href: "/admin/venues", icon: MapPin },
   { label: "Users", href: "/admin/users", icon: Users },
+  { label: "Managers", href: "/admin/managers", icon: Users },
   { label: "Advanced", href: "/admin/advanced", icon: Database },
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];

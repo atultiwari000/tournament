@@ -66,7 +66,26 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Check 5-hour rule
+    // Fetch venue to get manager
+    const venueRef = doc(db, "venues", booking.venueId);
+    const venueSnap = await getDoc(venueRef);
+    let cancellationLimit = 5; // Default
+
+    if (venueSnap.exists()) {
+      const venue = venueSnap.data();
+      if (venue.managedBy) {
+        const managerRef = doc(db, "users", venue.managedBy);
+        const managerSnap = await getDoc(managerRef);
+        if (managerSnap.exists()) {
+          const managerData = managerSnap.data();
+          if (managerData.cancellationHoursLimit !== undefined) {
+            cancellationLimit = managerData.cancellationHoursLimit;
+          }
+        }
+      }
+    }
+
+    // Check cancellation limit rule
     const now = new Date();
     const bookingDateStr = booking.date;
     const bookingTimeStr = booking.startTime;
@@ -75,10 +94,10 @@ export async function POST(
     const diffMs = bookingDateTime.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
-    if (diffHours < 5) {
+    if (diffHours < cancellationLimit) {
       return NextResponse.json(
         {
-          error: "Cannot cancel booking within 5 hours of start time.",
+          error: `Cannot cancel booking within ${cancellationLimit} hours of start time.`,
           canCancel: false,
         },
         { status: 400 }

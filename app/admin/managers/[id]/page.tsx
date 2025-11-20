@@ -11,6 +11,8 @@ import {
   getDoc,
   updateDoc,
   Timestamp,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -21,12 +23,15 @@ import {
   CreditCard,
   Banknote,
   AlertCircle,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,6 +43,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ManagerStats {
   totalBookings: number;
@@ -51,6 +62,7 @@ interface ManagerStats {
 export default function ManagerDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [manager, setManager] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ManagerStats>({
@@ -62,8 +74,12 @@ export default function ManagerDetailsPage() {
     safeOnlineIncome: 0,
   });
   const [payoutAmount, setPayoutAmount] = useState("");
+  const [payoutNotes, setPayoutNotes] = useState("");
+  const [transactionId, setTransactionId] = useState("");
   const [isPayoutDialogOpen, setIsPayoutDialogOpen] = useState(false);
   const [processingPayout, setProcessingPayout] = useState(false);
+  const [cancellationLimit, setCancellationLimit] = useState(5);
+  const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -77,7 +93,12 @@ export default function ManagerDetailsPage() {
           router.push("/admin/managers");
           return;
         }
-        setManager({ id: userDoc.id, ...userDoc.data() });
+        const userData = userDoc.data();
+        setManager({ id: userDoc.id, ...userData });
+        
+        // Set cancellation limit from user data or default to 5
+        const limit = userData.cancellationHoursLimit !== undefined ? userData.cancellationHoursLimit : 5;
+        setCancellationLimit(limit);
 
         // 2. Fetch Venues managed by this user
         const venuesQuery = query(
@@ -119,14 +140,14 @@ export default function ManagerDetailsPage() {
           const amount = Number(b.amount || b.price || 0);
           totalIncome += amount;
 
-          const isOnline =
-            b.paymentMethod === "esewa" || b.paymentMethod === "khalti"; // Add other online methods if any
+          const method = (b.bookingType || "").toLowerCase();
+          const isOnline = method === "website" || method === "app";
 
           if (isOnline) {
             onlineBookings++;
             onlineIncome += amount;
 
-            // Check if safe to pay (booking time is within 5 hours from now or in the past)
+            // Check if safe to pay (booking time is within X hours from now or in the past)
             // Booking time construction:
             const bookingDateStr = b.date; // "YYYY-MM-DD"
             const bookingTimeStr = b.startTime; // "HH:mm"
@@ -138,9 +159,9 @@ export default function ManagerDetailsPage() {
             const diffMs = bookingDateTime.getTime() - now.getTime();
             const diffHours = diffMs / (1000 * 60 * 60);
 
-            // If diffHours < 5, it means booking is either in past or within next 5 hours.
+            // If diffHours < limit, it means booking is either in past or within next X hours.
             // User cannot cancel, so it's safe.
-            if (diffHours < 5) {
+            if (diffHours < limit) {
               safeOnlineIncome += amount;
             }
           } else {
@@ -165,7 +186,22 @@ export default function ManagerDetailsPage() {
     };
 
     fetchData();
-  }, [id, router]);
+  }, [id, router]); // Removed cancellationLimit from dependency to avoid loop, logic is inside
+
+  const handleUpdateLimit = async () => {
+    try {
+      await updateDoc(doc(db, "users", id as string), {
+        cancellationHoursLimit: cancellationLimit,
+      });
+      toast.success("Cancellation limit updated");
+      setIsLimitDialogOpen(false);
+      // Refresh data to recalculate safe income
+      window.location.reload(); 
+    } catch (error) {
+      console.error("Error updating limit:", error);
+      toast.error("Failed to update limit");
+    }
+  };
 
   const handlePayout = async () => {
     const amount = parseFloat(payoutAmount);
@@ -174,19 +210,40 @@ export default function ManagerDetailsPage() {
       return;
     }
 
+    const currentPaidOut = manager.totalPaidOut || 0;
+    const actualPaymentToBePaid = stats.safeOnlineIncome - currentPaidOut;
+
+    if (amount > actualPaymentToBePaid) {
+      toast.error(`Cannot pay more than safe amount: Rs. ${actualPaymentToBePaid.toLocaleString()}`);
+      return;
+    }
+
     setProcessingPayout(true);
     try {
-      const currentPaidOut = manager.totalPaidOut || 0;
       const newPaidOut = currentPaidOut + amount;
 
+      // 1. Update Manager's totalPaidOut
       await updateDoc(doc(db, "users", id as string), {
         totalPaidOut: newPaidOut,
+      });
+
+      // 2. Create Payout Record
+      await addDoc(collection(db, "payouts"), {
+        managerId: id,
+        amount: amount,
+        date: serverTimestamp(),
+        transactionId: transactionId,
+        notes: payoutNotes,
+        adminId: currentUser?.uid || "unknown",
+        adminEmail: currentUser?.email || "unknown",
       });
 
       setManager((prev: any) => ({ ...prev, totalPaidOut: newPaidOut }));
       toast.success("Payout recorded successfully");
       setIsPayoutDialogOpen(false);
       setPayoutAmount("");
+      setPayoutNotes("");
+      setTransactionId("");
     } catch (error) {
       console.error("Error recording payout:", error);
       toast.error("Failed to record payout");
@@ -202,183 +259,275 @@ export default function ManagerDetailsPage() {
   if (!manager) return null;
 
   const totalPaidOut = manager.totalPaidOut || 0;
-  const toBePaid = stats.safeOnlineIncome - totalPaidOut;
+  
+  // Derived calculations based on user request
+  const physicalIncome = stats.totalIncome - stats.onlineIncome;
+  const heldByManager = physicalIncome + totalPaidOut;
+  const heldByAdmin = stats.onlineIncome - totalPaidOut;
+  const totalToBePaid = heldByAdmin; // All online income not yet paid out
+  const actualPaymentToBePaid = stats.safeOnlineIncome - totalPaidOut; // Safe online income not yet paid out
 
   return (
-    <div className="space-y-6 p-6 max-w-6xl mx-auto">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => router.push("/admin/managers")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {manager.displayName || "Manager Details"}
-          </h1>
-          <p className="text-muted-foreground">{manager.email}</p>
+    <TooltipProvider>
+      <div className="space-y-6 p-6 max-w-6xl mx-auto">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => router.push("/admin/managers")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {manager.displayName || "Manager Details"}
+            </h1>
+            <p className="text-muted-foreground">{manager.email}</p>
+          </div>
         </div>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Bookings
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalBookings}</div>
-            <p className="text-xs text-muted-foreground">
-              Lifetime bookings
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Physical vs Online
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.physicalBookings} / {stats.onlineBookings}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Physical / Online
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              Rs. {stats.totalIncome.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Gross revenue generated
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Online Income (Held)
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              Rs. {stats.onlineIncome.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Collected via eSewa
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Banknote className="h-5 w-5 text-primary" />
-            Payout Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-muted-foreground">
-                Safe to Pay (Cleared)
-              </span>
-              <div className="text-2xl font-bold text-green-600">
-                Rs. {stats.safeOnlineIncome.toLocaleString()}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">All Income</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                Rs. {stats.totalIncome.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                Bookings within 5h or past
+                Total Revenue Generated
               </p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-muted-foreground">
-                Total Paid Out
-              </span>
-              <div className="text-2xl font-bold text-blue-600">
-                Rs. {totalPaidOut.toLocaleString()}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Held by Manager</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                Rs. {heldByManager.toLocaleString()}
               </div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-muted-foreground">
-                To Be Paid (Balance)
-              </span>
-              <div className="text-2xl font-bold text-primary">
-                Rs. {toBePaid.toLocaleString()}
+              <p className="text-xs text-muted-foreground">
+                Physical ({physicalIncome.toLocaleString()}) + Paid Out ({totalPaidOut.toLocaleString()})
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                Held by Admin
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-3 w-3 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Online Income ({stats.onlineIncome.toLocaleString()}) - Paid Out ({totalPaidOut.toLocaleString()})</p>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                Rs. {heldByAdmin.toLocaleString()}
               </div>
-            </div>
-          </div>
+              <p className="text-xs text-muted-foreground">
+                Currently in Admin Account
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="h-4 w-4" />
-              <span>
-                Only pay amounts that are "Safe to Pay". Users cannot cancel
-                bookings within 5 hours of start time.
-              </span>
-            </div>
-            <Dialog
-              open={isPayoutDialogOpen}
-              onOpenChange={setIsPayoutDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button>Record Payout</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Record Payout to Manager</DialogTitle>
-                  <DialogDescription>
-                    Enter the amount you have manually transferred to the manager.
-                    This will update their balance.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="amount" className="text-right text-sm">
-                      Amount
-                    </label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      value={payoutAmount}
-                      onChange={(e) => setPayoutAmount(e.target.value)}
-                      className="col-span-3"
-                      placeholder="e.g. 5000"
-                    />
-                  </div>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-primary" />
+              Payout Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Total To Be Paid
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total Online Income held by Admin that needs to be paid eventually.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
+                <div className="text-2xl font-bold text-orange-600">
+                  Rs. {totalToBePaid.toLocaleString()}
                 </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsPayoutDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handlePayout} disabled={processingPayout}>
-                    {processingPayout ? "Recording..." : "Confirm Payout"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                <p className="text-xs text-muted-foreground">
+                  Held by Admin
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Actual Payment To Be Paid
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Safe Online Income (past cancellation window) minus Paid Out.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
+                <div className="text-2xl font-bold text-primary">
+                  Rs. {actualPaymentToBePaid.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Safe to Pay Now
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  In Manager Account
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total amount already transferred to manager.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
+                <div className="text-2xl font-bold text-blue-600">
+                  Rs. {totalPaidOut.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Paid Out
+                </p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4" />
+                <span>
+                  Only pay amounts that are "Net Payable Now". Users cannot cancel
+                  bookings within {cancellationLimit} hours of start time.
+                </span>
+                <Dialog open={isLimitDialogOpen} onOpenChange={setIsLimitDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="link" className="h-auto p-0 text-xs">
+                      (Edit Limit)
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Cancellation Limit</DialogTitle>
+                      <DialogDescription>
+                        Set the number of hours before booking start time when cancellation is disabled.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <label htmlFor="limit" className="text-right text-sm">
+                          Hours
+                        </label>
+                        <Input
+                          id="limit"
+                          type="number"
+                          value={cancellationLimit}
+                          onChange={(e) => setCancellationLimit(Number(e.target.value))}
+                          className="col-span-3"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleUpdateLimit}>Save Limit</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <Dialog
+                open={isPayoutDialogOpen}
+                onOpenChange={setIsPayoutDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button>Record Payout</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Record Payout to Manager</DialogTitle>
+                    <DialogDescription>
+                      Enter the amount you have manually transferred to the manager.
+                      This will update their balance.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="amount" className="text-right text-sm">
+                        Amount
+                      </label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        value={payoutAmount}
+                        onChange={(e) => setPayoutAmount(e.target.value)}
+                        className="col-span-3"
+                        placeholder={`Max: ${actualPaymentToBePaid}`}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="txnId" className="text-right text-sm">
+                        Txn ID
+                      </label>
+                      <Input
+                        id="txnId"
+                        value={transactionId}
+                        onChange={(e) => setTransactionId(e.target.value)}
+                        className="col-span-3"
+                        placeholder="Bank/Wallet Transaction ID"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-start gap-4">
+                      <label htmlFor="notes" className="text-right text-sm pt-2">
+                        Notes
+                      </label>
+                      <Textarea
+                        id="notes"
+                        value={payoutNotes}
+                        onChange={(e) => setPayoutNotes(e.target.value)}
+                        className="col-span-3"
+                        placeholder="Additional details..."
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">
+                      Safe to Pay: Rs. {actualPaymentToBePaid.toLocaleString()}
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsPayoutDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handlePayout} disabled={processingPayout}>
+                      {processingPayout ? "Recording..." : "Confirm Payout"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   );
 }

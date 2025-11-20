@@ -647,8 +647,8 @@ const UserBookingsPage = () => {
                     variant="destructive"
                     size="sm"
                     className="flex-1"
-                    disabled={cancellingId === booking.id || !canCancel(booking)}
-                    title={!canCancel(booking) ? "Cannot cancel within 5 hours of start time" : "Cancel booking"}
+                    disabled={cancellingId === booking.id}
+                    title="Cancel booking"
                   >
                     {cancellingId === booking.id ? (
                       <>
