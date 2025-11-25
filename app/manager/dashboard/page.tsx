@@ -178,7 +178,7 @@ const ManagerDashboardPage = () => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pt-14 lg:pt-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -187,34 +187,32 @@ const ManagerDashboardPage = () => {
         <div className="flex gap-2">
           <Button onClick={() => router.push(`/venue/${venueId}`)} variant="outline">
             <Store className="mr-2 h-4 w-4" />
-            View Venue
           </Button>
-          
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6 pt-0">
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Gross Revenue:</span>
-                <span className="text-xl font-bold">Rs. {stats.totalRevenue.toLocaleString()}</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                <span className="text-xs sm:text-sm text-muted-foreground">Gross Revenue:</span>
+                <span className="text-base sm:text-xl font-bold">Rs. {stats.totalRevenue.toLocaleString()}</span>
               </div>
               {stats.commissionPercentage > 0 && (
                 <>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Commission ({stats.commissionPercentage}%):</span>
-                    <span className="text-red-600 font-medium">- Rs. {stats.commissionAmount.toLocaleString()}</span>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm gap-1 sm:gap-0">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Commission ({stats.commissionPercentage}%):</span>
+                    <span className="text-xs sm:text-sm text-red-600 font-medium">- Rs. {stats.commissionAmount.toLocaleString()}</span>
                   </div>
-                  <div className="border-t pt-2 flex justify-between items-center">
-                    <span className="text-sm font-medium">Net Revenue:</span>
-                    <span className="text-2xl font-bold text-green-600">Rs. {stats.netRevenue.toLocaleString()}</span>
+                  <div className="border-t pt-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                    <span className="text-xs sm:text-sm font-medium">Net Revenue:</span>
+                    <span className="text-base sm:text-2xl font-bold text-green-600">Rs. {stats.netRevenue.toLocaleString()}</span>
                   </div>
                 </>
               )}
@@ -225,36 +223,36 @@ const ManagerDashboardPage = () => {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
             <CardTitle className="text-sm font-medium">Active Bookings</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeBookings}</div>
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{stats.activeBookings}</div>
             <p className="text-xs text-muted-foreground">
               {stats.pendingBookings} pending payment
             </p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
             <CardTitle className="text-sm font-medium">Physical Bookings</CardTitle>
             <Store className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.physicalBookings}</div>
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{stats.physicalBookings}</div>
             <p className="text-xs text-muted-foreground">
               Manual reservations
             </p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
             <CardTitle className="text-sm font-medium">Online Bookings</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.onlineBookings}</div>
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{stats.onlineBookings}</div>
             <p className="text-xs text-muted-foreground">
               Website reservations
             </p>
@@ -262,9 +260,9 @@ const ManagerDashboardPage = () => {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
         {/* Recent Bookings */}
-        <Card className="col-span-4">
+        <Card className="col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Recent Bookings</CardTitle>
@@ -276,66 +274,116 @@ const ManagerDashboardPage = () => {
               <Link href="/manager/bookings">View All</Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {recentBookings.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No bookings found.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile Card View */}
+                <div className="block sm:hidden space-y-4">
                   {recentBookings.map((booking) => (
-                    <TableRow key={booking.id}>
-                      <TableCell className="font-medium">
-                        {booking.bookingType === "physical" ? (
-                          <div className="flex flex-col">
-                            <span>{booking.customerName || "Walk-in"}</span>
-                            <span className="text-xs text-muted-foreground">{booking.customerPhone}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
+                    <div key={booking.id} className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-100">
+                      <div className="flex justify-between items-start">
+                        <div className="font-medium">
+                          {booking.bookingType === "physical" ? (
+                            <div className="flex flex-col">
+                              <span>{booking.customerName || "Walk-in"}</span>
+                              <span className="text-xs text-muted-foreground">{booking.customerPhone}</span>
+                            </div>
+                          ) : (
                             <span>Online User</span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span>{booking.date}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {booking.startTime} - {booking.endTime}
-                          </span>
+                          )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {booking.bookingType === "physical" ? (
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Physical</Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Online</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                      <TableCell className="text-right">
-                        {booking.amount ? `Rs. ${booking.amount}` : "-"}
-                      </TableCell>
-                    </TableRow>
+                        {getStatusBadge(booking.status)}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex flex-col text-muted-foreground">
+                          <span className="text-xs uppercase tracking-wider">Date</span>
+                          <span className="text-gray-900">{booking.date}</span>
+                        </div>
+                        <div className="flex flex-col text-muted-foreground">
+                          <span className="text-xs uppercase tracking-wider">Time</span>
+                          <span className="text-gray-900">{booking.startTime} - {booking.endTime}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <div>
+                          {booking.bookingType === "physical" ? (
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">Physical</Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Online</Badge>
+                          )}
+                        </div>
+                        <div className="font-bold">
+                          {booking.amount ? `Rs. ${booking.amount}` : "-"}
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentBookings.map((booking) => (
+                        <TableRow key={booking.id}>
+                          <TableCell className="font-medium">
+                            {booking.bookingType === "physical" ? (
+                              <div className="flex flex-col">
+                                <span>{booking.customerName || "Walk-in"}</span>
+                                <span className="text-xs text-muted-foreground">{booking.customerPhone}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span>Online User</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span>{booking.date}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {booking.startTime} - {booking.endTime}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {booking.bookingType === "physical" ? (
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Physical</Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Online</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                          <TableCell className="text-right">
+                            {booking.amount ? `Rs. ${booking.amount}` : "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
         {/* Quick Actions */}
-        <Card className="col-span-3">
+        <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Manage your venue efficiently</CardDescription>

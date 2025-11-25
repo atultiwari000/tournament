@@ -257,7 +257,7 @@ export default function ManagerPaymentsPage() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-6 pt-14 lg:pt-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">My Venue Payments</h1>
@@ -271,13 +271,13 @@ export default function ManagerPaymentsPage() {
         </div>
 
         {/* Financial Overview Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium">Held by Admin</CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold">
                 Rs. {heldByAdmin.toLocaleString()}
               </div>
@@ -288,7 +288,7 @@ export default function ManagerPaymentsPage() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 Total To Be Paid
                 <Tooltip>
@@ -302,7 +302,7 @@ export default function ManagerPaymentsPage() {
               </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold text-orange-600">
                 Rs. {totalToBePaid.toLocaleString()}
               </div>
@@ -313,7 +313,7 @@ export default function ManagerPaymentsPage() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 Actual To Be Paid
                 <Tooltip>
@@ -327,7 +327,7 @@ export default function ManagerPaymentsPage() {
               </CardTitle>
               <Banknote className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold text-primary">
                 Rs. {actualPaymentToBePaid.toLocaleString()}
               </div>
@@ -338,11 +338,11 @@ export default function ManagerPaymentsPage() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium">Held by Me</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold">
                 Rs. {heldByManager.toLocaleString()}
               </div>
@@ -356,7 +356,7 @@ export default function ManagerPaymentsPage() {
         {/* Commission Card */}
         {stats.commissionPercentage > 0 && (
           <Card className="border-red-200 dark:border-red-900">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 Commission Deducted
                 <Tooltip>
@@ -370,7 +370,7 @@ export default function ManagerPaymentsPage() {
               </CardTitle>
               <AlertCircle className="h-4 w-4 text-red-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold text-red-600">
                 Rs. {stats.commissionAmount.toLocaleString()}
               </div>
@@ -385,13 +385,13 @@ export default function ManagerPaymentsPage() {
         )}
 
         {/* Transaction Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold">
                 Rs. {stats.totalIncome.toLocaleString()}
               </div>
@@ -401,11 +401,11 @@ export default function ManagerPaymentsPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold">
                 {filteredPayments.length > 0
                   ? Math.round(
@@ -420,11 +420,11 @@ export default function ManagerPaymentsPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-sm font-medium">Failed/Pending</CardTitle>
               <XCircle className="h-4 w-4 text-red-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <div className="text-2xl font-bold">
                 {
                   filteredPayments.filter((p) => p.status !== "success").length
@@ -462,67 +462,22 @@ export default function ManagerPaymentsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Venue</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ref ID</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Loading payments...
-                  </TableCell>
-                </TableRow>
-              ) : filteredPayments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    No payments found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {payment.createdAt?.seconds
-                        ? format(
-                            new Date(payment.createdAt.seconds * 1000),
-                            "MMM d, yyyy HH:mm"
-                          )
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>
+        <CardContent className="p-0 sm:p-6">
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading payments...</div>
+          ) : filteredPayments.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No payments found.</div>
+          ) : (
+            <>
+              {/* Mobile Card View */}
+              <div className="block sm:hidden space-y-4 p-4">
+                {filteredPayments.map((payment) => (
+                  <div key={payment.id} className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-100">
+                    <div className="flex justify-between items-start">
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm">
-                          {payment.userEmail || "Unknown User"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {payment.userId.slice(0, 8)}...
-                        </span>
+                        <span className="font-medium text-sm">{payment.userEmail || "Unknown User"}</span>
+                        <span className="text-xs text-muted-foreground">{payment.venueName || "Unknown Venue"}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm">
-                          {payment.venueName || "Unknown Venue"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      NPR {payment.amount?.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="capitalize text-xs">
-                      {payment.method}
-                    </TableCell>
-                    <TableCell>
                       <Badge
                         variant={
                           payment.status === "success"
@@ -531,19 +486,111 @@ export default function ManagerPaymentsPage() {
                             ? "secondary"
                             : "destructive"
                         }
-                        className="capitalize"
+                        className="capitalize text-xs"
                       >
                         {payment.status}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-xs font-mono">
-                      {payment.refId || "-"}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex flex-col text-muted-foreground">
+                        <span className="text-xs uppercase tracking-wider">Date</span>
+                        <span className="text-gray-900">
+                          {payment.createdAt?.seconds
+                            ? format(new Date(payment.createdAt.seconds * 1000), "MMM d, yyyy")
+                            : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex flex-col text-muted-foreground">
+                        <span className="text-xs uppercase tracking-wider">Amount</span>
+                        <span className="text-gray-900 font-bold">NPR {payment.amount?.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground capitalize">{payment.method}</span>
+                      </div>
+                      <div className="font-mono text-muted-foreground">
+                        {payment.refId ? `#${payment.refId.slice(-6)}` : "-"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Venue</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ref ID</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPayments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="whitespace-nowrap text-xs">
+                          {payment.createdAt?.seconds
+                            ? format(
+                                new Date(payment.createdAt.seconds * 1000),
+                                "MMM d, yyyy HH:mm"
+                              )
+                            : "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">
+                              {payment.userEmail || "Unknown User"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {payment.userId.slice(0, 8)}...
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm">
+                              {payment.venueName || "Unknown Venue"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          NPR {payment.amount?.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="capitalize text-xs">
+                          {payment.method}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              payment.status === "success"
+                                ? "default"
+                                : payment.status === "pending"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                            className="capitalize"
+                          >
+                            {payment.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-mono">
+                          {payment.refId || "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
