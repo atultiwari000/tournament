@@ -169,10 +169,10 @@ const Home = () => {
                   Join as Player
                 </a>
                 <a
-                  href="/auth/register"
+                  href="/venues"
                   className="inline-flex items-center justify-center px-6 py-3 text-base rounded-full font-semibold transition-all duration-300 bg-transparent text-slate-700 dark:text-white border border-slate-300 dark:border-white/20 hover:border-green-500 dark:hover:border-green-500 hover:text-green-500 dark:hover:text-green-500"
                 >
-                  List Your Venue
+                  List Venue
                 </a>
               </div>
             </div>
