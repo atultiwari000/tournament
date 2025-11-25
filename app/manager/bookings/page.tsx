@@ -30,6 +30,8 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { NoVenueAccess } from "@/components/manager/NoVenueAccess";
 import { managerCancelBooking } from "@/app/actions/bookings";
+import { useSearchParams } from "next/navigation";
+import { useRef } from "react";
 
 const ManagerBookingsPage = () => {
   const { user } = useAuth();
@@ -40,6 +42,9 @@ const ManagerBookingsPage = () => {
   const [hasVenueAccess, setHasVenueAccess] = useState<boolean | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [venueId, setVenueId] = useState<string | null>(null);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const bookingRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
   const fetchVenueAndBookings = useCallback(async () => {
     if (!user) return;
@@ -143,6 +148,29 @@ const ManagerBookingsPage = () => {
       fetchVenueAndBookings();
     }
   }, [user, fetchVenueAndBookings]);
+
+  // Handle highlighting booking from URL parameter
+  useEffect(() => {
+    const bookingIdParam = searchParams.get('bookingId');
+    if (bookingIdParam && bookings.length > 0) {
+      setHighlightedBookingId(bookingIdParam);
+      
+      // Scroll to the booking after a short delay to ensure rendering
+      setTimeout(() => {
+        const element = bookingRefs.current.get(bookingIdParam);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+
+      // Remove highlight after 3 seconds
+      const timer = setTimeout(() => {
+        setHighlightedBookingId(null);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, bookings]);
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
@@ -262,48 +290,61 @@ const ManagerBookingsPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredBookings.map((booking) => (
-                    <TableRow key={booking.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{booking.displayName}</span>
-                          {booking.contact && (
-                            <span className="text-xs text-muted-foreground">{booking.contact}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span>{booking.date}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {booking.startTime} - {booking.endTime}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {booking.bookingType === "physical" ? (
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Physical</Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Online</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                      <TableCell>
-                        {booking.amount ? `Rs. ${booking.amount}` : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {(booking.status === "CONFIRMED" || booking.status === "confirmed") && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleCancelBooking(booking)}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                    {filteredBookings.map((booking) => {
+                      const isHighlighted = highlightedBookingId === booking.id;
+                      return (
+                        <TableRow
+                          key={booking.id}
+                          ref={(el) => {
+                            if (el) {
+                              bookingRefs.current.set(booking.id, el);
+                            } else {
+                              bookingRefs.current.delete(booking.id);
+                            }
+                          }}
+                          className={isHighlighted ? "bg-yellow-100 dark:bg-yellow-900/20 transition-colors duration-500" : ""}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>{booking.displayName}</span>
+                              {booking.contact && (
+                                <span className="text-xs text-muted-foreground">{booking.contact}</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span>{booking.date}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {booking.startTime} - {booking.endTime}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {booking.bookingType === "physical" ? (
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Physical</Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Online</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                          <TableCell>
+                            {booking.amount ? `Rs. ${booking.amount}` : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {(booking.status === "CONFIRMED" || booking.status === "confirmed") && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleCancelBooking(booking)}
+                              >
+                                Cancel
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </TableBody>
               </Table>
             </div>

@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Loader2, Store } from "lucide-react";
+import { Loader2, Store, ExternalLink } from "lucide-react";
 import { BookingSummary } from "@/components/BookingSummary";
 import { cn } from "@/lib/utils";
 
@@ -299,7 +299,7 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
     setIsProcessing(true);
 
     try {
-      const token = await user.getIdToken();
+      const token = await user!.getIdToken();
       const result = await unblockSlot(token, groundId, slot.date, slot.startTime);
       
       if (!result.success) throw new Error(result.error);
@@ -315,33 +315,30 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   };
 
   const handleSlotClick = (slot: ReconstructedSlot) => {
-    // User can't click held slots (except their own - they should go to payment)
-    if (!isManager && slot.status === "HELD") {
+    if (!canClickSlot(slot)) {
+      // If it's a booked slot and user is a manager, navigate to booking details
+      if (slot.status === "BOOKED" && slot.bookingId && isManager) {
+        router.push(`/manager/bookings?bookingId=${slot.bookingId}`);
+        return;
+      }
+      // If it's a booked slot and user is the one who booked it, navigate to their bookings
+      if (slot.status === "BOOKED" && slot.bookingId && user && slot.userId === user.uid) {
+        router.push(`/user/bookings?bookingId=${slot.bookingId}`);
+        return;
+      }
       return;
     }
 
-    // User booking
-    if (!isManager && slot.status === "AVAILABLE") {
-      setSelectedSlot(slot);
-      setBookingDialogOpen(true);
-      return;
-    }
-
-    // Manager unblock blocked slots
-    if (isManager && slot.status === "BLOCKED") {
-      handleUnblockSlot(slot);
-      return;
-    }
-
-    // Manager unbook physical bookings
-    if (isManager && slot.status === "BOOKED" && slot.bookingType === "physical") {
-      handleUnbookPhysical(slot);
-      return;
-    }
+    setSelectedSlot(slot);
 
     if (isManager && slot.status === "AVAILABLE") {
-      handlePhysicalReservation(slot);
-      return;
+      setBookingDialogOpen(true);
+    } else if (slot.status === "AVAILABLE") {
+      setBookingDialogOpen(true);
+    } else if (isManager && slot.status === "BLOCKED") {
+      handleUnblockSlot(slot);
+    } else if (isManager && slot.status === "BOOKED" && slot.bookingType === "physical") {
+      handleUnbookPhysical(slot);
     }
   };
 
@@ -372,7 +369,12 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   const getSlotClassName = (slot: ReconstructedSlot): string => {
     const baseClasses = "relative h-12 sm:h-14 rounded-lg border text-xs sm:text-sm font-medium transition-all duration-200 flex flex-col items-center justify-center gap-0.5 overflow-hidden";
     
-    const clickable = canClickSlot(slot);
+    // Make booked slots clickable for managers and the user who booked it
+    const isBookedAndClickable = slot.status === "BOOKED" && slot.bookingId && (
+      (isManager) || (user && slot.userId === user.uid)
+    );
+    
+    const clickable = canClickSlot(slot) || isBookedAndClickable;
     const hoverClasses = clickable
       ? "cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
       : "cursor-default opacity-80";
@@ -383,9 +385,9 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
       
       case "BOOKED":
         if (slot.bookingType === "physical") {
-          return cn(baseClasses, hoverClasses, "bg-purple-50 border-purple-200 text-purple-700");
+          return cn(baseClasses, hoverClasses, "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100");
         }
-        return cn(baseClasses, "bg-amber-50 border-amber-200 text-amber-700");
+        return cn(baseClasses, hoverClasses, "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100");
       
       case "BLOCKED":
         return cn(baseClasses, hoverClasses, "bg-red-50 border-red-200 text-red-700");
@@ -412,11 +414,13 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
         );
       
       case "BOOKED":
+        const isClickable = slot.bookingId && ((isManager) || (user && slot.userId === user.uid));
         return (
           <>
             <div className="flex items-center gap-1">
               {slot.bookingType === "physical" && <Store className="w-3 h-3" />}
               <span>{slot.startTime}</span>
+              {isClickable && <ExternalLink className="w-2.5 h-2.5 opacity-60" />}
             </div>
             <span className="text-[10px] font-normal opacity-80 truncate max-w-[90%]">
               {slot.customerName || "Booked"}
@@ -540,7 +544,8 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
                       <div key={`${slot.date}_${slot.startTime}`} className="relative group">
                         <div
                           className={getSlotClassName(slot)}
-                          onClick={() => canClickSlot(slot) && handleSlotClick(slot)}
+                          onClick={() => handleSlotClick(slot)}
+                          title={slot.status === "BOOKED" && slot.bookingId ? "Click to view booking details" : undefined}
                         >
                           {getSlotContent(slot)}
                         </div>
