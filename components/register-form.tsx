@@ -18,7 +18,7 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -61,28 +61,31 @@ export function RegisterForm({
     data: Partial<Record<string, any>>,
   ) => {
     try {
-      const userRef = doc(db, "users", uid);
-      const snap = await getDoc(userRef);
+      // Call server API to upsert the user doc. Server will verify token and assign role safely.
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("No ID token available");
 
-      const base = {
-        email: data.email ?? null,
-        displayName: data.displayName ?? null,
-        photoURL: data.photoURL ?? null,
-        lastSeen: serverTimestamp(),
-      };
+      const resp = await fetch(`/api/users/upsert`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          displayName: data.displayName ?? null,
+          email: data.email ?? null,
+          photoURL: data.photoURL ?? null,
+          role,
+        }),
+      });
 
-      if (!snap.exists()) {
-        await setDoc(userRef, {
-          ...base,
-          role: role,
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        await setDoc(userRef, base, { merge: true });
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => ({}));
+        console.error("Upsert user API failed:", json);
+        throw new Error(json?.error || "Failed to upsert user record");
       }
     } catch (err) {
       console.error("safeUpsertUserDoc error:", err);
-      // Do not surface Firestore internals to the user beyond a generic message.
       throw new Error("Failed to create user record");
     }
   };

@@ -7,10 +7,6 @@ import {
   query,
   where,
   getDocs,
-  doc,
-  setDoc,
-  updateDoc,
-  serverTimestamp,
   orderBy,
 } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -102,30 +98,34 @@ export default function BookingForm({ venueId }: BookingFormProps) {
     setLoading(true);
 
     try {
-      const selectedSlot = timeSlots.find(
-        (slot) => slot.id === selectedTimeSlotId
-      );
+      const selectedSlot = timeSlots.find((slot) => slot.id === selectedTimeSlotId);
       if (!selectedSlot) {
         toast.error("Selected time slot is not valid.");
         setLoading(false);
         return;
       }
 
-      const bookingRef = doc(collection(db, "bookings"));
-      await setDoc(bookingRef, {
-        venueId,
-        userId: user.uid,
-        timeSlot: `${selectedSlot.date} ${selectedSlot.startTime} - ${selectedSlot.endTime}`,
-        slotId: selectedTimeSlotId,
-        status: "pending",
-        createdAt: serverTimestamp(),
+      // Get Firebase ID token to authenticate server request
+      const idToken = await user.getIdToken();
+
+      const resp = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ venueId, slotId: selectedTimeSlotId }),
       });
 
-      const slotRef = doc(db, "slots", selectedTimeSlotId);
-      await updateDoc(slotRef, {
-        status: "booked",
-      });
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => ({}));
+        console.error("Booking API failed:", json);
+        toast.error(json?.error || "Failed to create booking. Please try again.");
+        setLoading(false);
+        return;
+      }
 
+      const data = await resp.json();
       toast.success("Booking successful! Awaiting confirmation.");
       setTimeSlots(timeSlots.filter((slot) => slot.id !== selectedTimeSlotId));
       setSelectedTimeSlotId("");

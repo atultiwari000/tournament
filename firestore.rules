@@ -20,11 +20,10 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
+      // Reads allowed for authenticated users (to get role, etc.)
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && 
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
-      allow delete: if isAdmin();
+      // All writes to user documents must go through server-side endpoints (admin SDK).
+      allow write: if false;
     }
     
     // Venues collection
@@ -38,6 +37,12 @@ service cloud.firestore {
     match /venueSlots/{venueId} {
       allow read: if true;
       allow write: if false; 
+    }
+    
+    // Slots collection - client should not write directly. Server endpoints must perform slot mutations.
+    match /slots/{slotId} {
+      allow read: if true;
+      allow write: if false;
     }
     
     // Bookings collection

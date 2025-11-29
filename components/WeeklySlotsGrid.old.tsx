@@ -9,12 +9,6 @@ import {
   where,
   doc,
   getDoc,
-  setDoc,
-  writeBatch,
-  addDoc,
-  serverTimestamp,
-  runTransaction,
-  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -138,80 +132,36 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
     fetchData();
   }, [fetchData]);
 
-  const handleHoldSlot = async (date: string, hour: string) => {
-    if (!user) {
-      toast.error("Please log in to book a slot.");
-      return;
-    }
-    const slotId = getSlotId(groundId, date, hour);
-    setProcessingSlotId(slotId);
 
+
+
+  const handleHoldSlot = async (slot: SlotWithId) => {
+    if (!user) return;
     try {
-      const bookingId = await runTransaction(db, async (transaction) => {
-        const slotDocRef = doc(db, "slots", slotId);
-        const slotDoc = await transaction.get(slotDocRef);
-        const now = Timestamp.now();
-        const fiveMinutesFromNow = new Timestamp(
-          now.seconds + 300,
-          now.nanoseconds
-        ); // 5 minute hold
-
-        if (slotDoc.exists()) {
-          const slotData = slotDoc.data();
-          const isHeld = slotData.status === "HELD";
-          const isHoldExpired =
-            isHeld &&
-            slotData.holdExpiresAt &&
-            slotData.holdExpiresAt.toMillis() < now.toMillis();
-
-          if (slotData.status !== "AVAILABLE" && !isHoldExpired) {
-            throw new Error("Slot is not available.");
-          }
-        }
-
-        transaction.set(
-          slotDocRef,
-          {
-            groundId: groundId,
-            date: date,
-            startTime: hour,
-            status: "HELD",
-            heldBy: user.uid,
-            holdExpiresAt: fiveMinutesFromNow,
-          },
-          { merge: true }
-        );
-
-        const bookingDocRef = doc(collection(db, "bookings"));
-        transaction.set(bookingDocRef, {
-          userId: user.uid,
-          venueId: groundId,
-          slotId: slotId,
-          date: date,
-          startTime: hour,
-          status: "PENDING_PAYMENT",
-          price: pricePerHour,
-          createdAt: serverTimestamp(),
-          bookingExpiresAt: fiveMinutesFromNow,
-        });
-
-        return bookingDocRef.id;
+      const slotId = getSlotId(slot.venueId, slot.date, slot.startTime);
+      const token = await user.getIdToken();
+      const resp = await fetch('/api/slots/hold', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ slotId, venueId: slot.venueId }),
       });
 
-      setIsBookingConfirmDialogOpen(false);
-      toast.success("Slot held for 5 minutes. Redirecting to payment...");
-      router.push(`/payment/${bookingId}`);
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => ({}));
+        console.error('Hold API failed:', json);
+        toast.error(json?.error || 'Failed to hold slot');
+        return;
+      }
+
+      const json = await resp.json();
+      toast.success('Slot held. Complete payment within 15 minutes.');
+      fetchData(false);
     } catch (error: any) {
-      console.error("Booking transaction failed: ", error);
-      toast.error(
-        error.message === "Slot is not available."
-          ? "This slot was just booked by someone else."
-          : "Failed to hold slot. Please try again."
-      );
-      setIsBookingConfirmDialogOpen(false);
-      fetchData(false); // Re-fetch to get the latest slot status
-    } finally {
-      setProcessingSlotId(null);
+      console.error('Error holding slot:', error);
+      toast.error(error.message || 'Failed to hold slot');
     }
   };
 
@@ -281,6 +231,34 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
         slotRef,
         {
           groundId,
+        const handleReserveSlot = async (slot: SlotWithId) => {
+          if (!user) return;
+          try {
+            const slotId = getSlotId(slot.venueId, slot.date, slot.startTime);
+            const token = await user.getIdToken();
+            const resp = await fetch('/api/slots/reserve', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ slotId, venueId: slot.venueId, userId: user.uid }),
+            });
+
+            if (!resp.ok) {
+              const json = await resp.json().catch(() => ({}));
+              console.error('Reserve API failed:', json);
+              toast.error(json?.error || 'Failed to reserve slot');
+              return;
+            }
+
+            toast.success('Slot reserved successfully');
+            fetchData(false);
+          } catch (error: any) {
+            console.error('Error reserving slot:', error);
+            toast.error(error.message || 'Failed to reserve slot');
+          }
+        };
           date,
           startTime,
           status: status,
@@ -314,35 +292,49 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
     const slotId = getSlotId(groundId, date, startTime);
 
     try {
-      // Create a physical booking record
-      const bookingRef = await addDoc(collection(db, "bookings"), {
-        venueId: groundId,
-        slotId: slotId,
-        date: date,
-        startTime: startTime,
-        timeSlot: `${date} ${startTime} - ${(parseInt(startTime.split(":")[0]) + 1).toString().padStart(2, "0")}:00`,
-        customerName: reservationDetails.customerName,
-        customerPhone: reservationDetails.customerPhone,
-        notes: reservationDetails.notes,
-        bookingType: "physical",
-        status: "confirmed",
-        createdAt: serverTimestamp(),
-      });
-
-      // Update slot status to RESERVED
-      const slotRef = doc(db, "slots", slotId);
-      await setDoc(
-        slotRef,
-        {
-          groundId,
-          date,
-          startTime,
-          status: "RESERVED",
-          bookingId: bookingRef.id,
-          updatedAt: serverTimestamp(),
+      const token = await user.getIdToken();
+      const resp = await fetch("/api/slots/reserve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        { merge: true }
-      );
+        body: JSON.stringify({ slotId, venueId: groundId, customerName: reservationDetails.customerName, customerPhone: reservationDetails.customerPhone, notes: reservationDetails.notes }),
+      });
+      const handleGenerateSlots = async (params: GenerateParams) => {
+        try {
+          if (!user) return;
+          const token = await user.getIdToken();
+          const resp = await fetch('/api/slots/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(params),
+          });
+
+          if (!resp.ok) {
+            const json = await resp.json().catch(() => ({}));
+            console.error('Generate API failed:', json);
+            toast.error(json?.error || 'Failed to generate slots');
+            return;
+          }
+
+          toast.success('Slots generated successfully');
+          fetchData(false);
+        } catch (error: any) {
+          console.error('Error generating slots:', error);
+          toast.error(error.message || 'Failed to generate slots');
+        }
+      };
+
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => ({}));
+        console.error("Reserve API failed:", json);
+        toast.error(json?.error || "Failed to reserve slot.");
+        return;
+      }
 
       toast.success("Slot reserved successfully for physical booking!");
       setIsReserveDialogOpen(false);
@@ -357,36 +349,24 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
   const handleGenerateSlots = async () => {
     if (!groundId) return;
     setGeneratingSlots(true);
-    const batch = writeBatch(db);
     try {
-      const dates = [...Array(7)].map(
-        (_, i) =>
-          new Date(new Date().setDate(new Date().getDate() + i))
-            .toISOString()
-            .split("T")[0]
-      );
-      const startHour = parseInt(startTime.split(":")[0], 10);
-      const endHour = parseInt(endTime.split(":")[0], 10);
-      dates.forEach((dateString) => {
-        for (let hour = startHour; hour < endHour; hour++) {
-          const hourString = `${hour.toString().padStart(2, "0")}:00`;
-          const slotId = getSlotId(groundId, dateString, hourString);
-          const newSlotRef = doc(db, "slots", slotId);
-          // We use set with merge to avoid overwriting booked slots unnecessarily
-          batch.set(
-            newSlotRef,
-            {
-              groundId: groundId,
-              date: dateString,
-              startTime: hourString,
-              status: "AVAILABLE",
-            },
-            { merge: true }
-          );
-        }
+      const token = await user.getIdToken();
+      const resp = await fetch("/api/slots/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ venueId: groundId, startTime, endTime, slotDuration: 60, days: 7 }),
       });
-      batch.update(doc(db, "venues", groundId), { startTime, endTime });
-      await batch.commit();
+
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => ({}));
+        console.error("Generate API failed:", json);
+        toast.error(json?.error || "An error occurred during slot generation.");
+        return;
+      }
+
       toast.success("Weekly slots generated successfully!");
       setIsGenerateSlotsDialogOpen(false);
       fetchData(false);
@@ -751,36 +731,30 @@ const WeeklySlotsGrid: React.FC<WeeklySlotsGridProps> = ({ groundId }) => {
                 onClick={async () => {
                   try {
                     const slotId = getSlotId(groundId, selectedSlot.date, selectedSlot.startTime);
-                    const slotRef = doc(db, "slots", slotId);
-                    const bookingRef = doc(db, "bookings", selectedSlot.bookingId);
-                    
-                    // Verify it's a physical booking before deleting
-                    await runTransaction(db, async (transaction) => {
-                      const bookingDoc = await transaction.get(bookingRef);
-                      
-                      if (!bookingDoc.exists()) {
-                        throw new Error("Booking not found");
-                      }
-                      
-                      const bookingData = bookingDoc.data();
-                      if (bookingData.bookingType !== "physical") {
-                        throw new Error("Only physical bookings can be unbooked by managers");
-                      }
-                      
-                      transaction.delete(bookingRef);
-                      transaction.update(slotRef, {
-                        status: "AVAILABLE",
-                        bookingId: null,
-                        updatedAt: serverTimestamp(),
-                      });
+                    const bookingId = selectedSlot.bookingId;
+                    const token = await user.getIdToken();
+                    const resp = await fetch('/api/slots/unbook', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ slotId, bookingId, venueId: groundId }),
                     });
-                    
-                    toast.success("Physical booking removed successfully");
+
+                    if (!resp.ok) {
+                      const json = await resp.json().catch(() => ({}));
+                      console.error('Unbook API failed:', json);
+                      toast.error(json?.error || 'Failed to remove booking');
+                      return;
+                    }
+
+                    toast.success('Physical booking removed successfully');
                     setIsSlotUpdateDialogOpen(false);
                     fetchData(false);
                   } catch (error: any) {
-                    console.error("Error removing booking:", error);
-                    toast.error(error.message || "Failed to remove booking");
+                    console.error('Error removing booking:', error);
+                    toast.error(error.message || 'Failed to remove booking');
                   }
                 }}
                 variant="destructive"
