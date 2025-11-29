@@ -53,5 +53,20 @@ service cloud.firestore {
       );
       allow write: if false;
     }
+
+    // Reviews collection - server-only writes
+    // Reviews and aggregated venue comments should be written via backend endpoints
+    // so we can enforce uniqueness, abuse protection, and correct aggregation.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Venue comments subcollection (used for public display)
+    match /venues/{venueId}/comments/{commentId} {
+      allow read: if true;
+      // All comment writes must be performed server-side to ensure consistency
+      allow write: if false;
+    }
   }
 }
