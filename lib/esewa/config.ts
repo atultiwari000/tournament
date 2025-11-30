@@ -20,18 +20,22 @@ const isProduction = process.env.NODE_ENV === 'production';
  * UAT: https://rc-epay.esewa.com.np/api/epay/main/v2/form
  * Production: https://epay.esewa.com.np/api/epay/main/v2/form
  */
-export const ESEWA_PAYMENT_URL = isProduction
-  ? 'https://epay.esewa.com.np/api/epay/main/v2/form'
-  : 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
+// export const ESEWA_PAYMENT_URL = isProduction
+//   ? 'https://epay.esewa.com.np/api/epay/main/v2/form'
+//   : 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
+
+export const ESEWA_PAYMENT_URL = 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
 
 /**
  * Transaction Status Verification URL
  * UAT: https://rc-epay.esewa.com.np/api/epay/transaction/status/
  * Production: https://epay.esewa.com.np/api/epay/transaction/status/
  */
-export const ESEWA_VERIFY_URL = isProduction
-  ? 'https://epay.esewa.com.np/api/epay/transaction/status/'
-  : 'https://rc-epay.esewa.com.np/api/epay/transaction/status/';
+// export const ESEWA_VERIFY_URL = isProduction
+//   ? 'https://epay.esewa.com.np/api/epay/transaction/status/'
+//   : 'https://rc-epay.esewa.com.np/api/epay/transaction/status/';
+
+export const ESEWA_VERIFY_URL = 'https://rc-epay.esewa.com.np/api/epay/transaction/status/';
 
 // ============================================================================
 // Merchant Configuration
@@ -71,7 +75,7 @@ export const getBaseUrl = (): string => {
   }
   
   return isProduction 
-    ? 'https://yourdomain.com' // Replace with your production domain
+    ? 'https://tournament-swart.vercel.app/' // Replace with your production domain
     : 'http://localhost:3000';
 };
 
