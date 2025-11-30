@@ -1,5 +1,5 @@
 import { db as clientDb } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, limit, getDocs } from "firebase/firestore";
 import { db as adminDb, isAdminInitialized } from "@/lib/firebase-admin";
 import admin from "firebase-admin";
 
@@ -66,29 +66,86 @@ export async function logPayment(data: PaymentLogData) {
       }
     }
 
-    // 3. Create payment record
+    // 3. Create payment record (idempotent)
     const dateString = new Date().toISOString().split('T')[0];
 
+    // Idempotency: avoid creating duplicate payment records.
+    // Check existing payments by `transactionUuid` first, then fallback
+    // to matching `bookingId` + `refId` if provided.
+    const txn = data.transactionUuid;
+    const bId = data.bookingId;
+    const rId = data.refId;
+
+    // Helper: check in admin DB
     if (isAdminInitialized()) {
-      const paymentRecordAdmin = {
-        ...data,
-        managerId,
-        venueName,
-        userEmail,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        dateString,
-      } as any;
-      await adminDb.collection("payments").add(paymentRecordAdmin);
+      try {
+        if (txn) {
+          const existing = await adminDb.collection('payments').where('transactionUuid', '==', txn).limit(1).get();
+          if (!existing.empty) {
+            console.log('ℹ️ Payment already logged (admin) for txn:', txn);
+            return true;
+          }
+        }
+
+        if (!txn && bId && rId) {
+          const existing = await adminDb.collection('payments')
+            .where('bookingId', '==', bId)
+            .where('refId', '==', rId)
+            .limit(1)
+            .get();
+          if (!existing.empty) {
+            console.log('ℹ️ Payment already logged (admin) for booking+ref:', bId, rId);
+            return true;
+          }
+        }
+
+        const paymentRecordAdmin = {
+          ...data,
+          managerId,
+          venueName,
+          userEmail,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          dateString,
+        } as any;
+        await adminDb.collection('payments').add(paymentRecordAdmin);
+      } catch (err) {
+        console.error('Error checking/adding payment (admin):', err);
+        throw err;
+      }
     } else {
-      const paymentRecord = {
-        ...data,
-        managerId,
-        venueName,
-        userEmail,
-        createdAt: serverTimestamp(),
-        dateString,
-      };
-      await addDoc(collection(clientDb, "payments"), paymentRecord);
+      try {
+        const paymentsRef = collection(clientDb, 'payments');
+        if (txn) {
+          const q = query(paymentsRef, where('transactionUuid', '==', txn), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            console.log('ℹ️ Payment already logged (client) for txn:', txn);
+            return true;
+          }
+        }
+
+        if (!txn && bId && rId) {
+          const q = query(paymentsRef, where('bookingId', '==', bId), where('refId', '==', rId), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            console.log('ℹ️ Payment already logged (client) for booking+ref:', bId, rId);
+            return true;
+          }
+        }
+
+        const paymentRecord = {
+          ...data,
+          managerId,
+          venueName,
+          userEmail,
+          createdAt: serverTimestamp(),
+          dateString,
+        };
+        await addDoc(paymentsRef, paymentRecord);
+      } catch (err) {
+        console.error('Error checking/adding payment (client):', err);
+        throw err;
+      }
     }
     console.log("✅ Payment logged successfully:", data.transactionUuid);
     return true;
