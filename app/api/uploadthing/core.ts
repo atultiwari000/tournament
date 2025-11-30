@@ -1,9 +1,29 @@
 
 import { createUploadthing, type FileRouter } from "uploadthing/next";
- 
+import { auth as firebaseAdminAuth, isAdminInitialized } from "../../../lib/firebase-admin";
+
 const f = createUploadthing();
- 
-const auth = (req: Request) => ({ id: "fakeId" }); // Fake auth
+
+const auth = async (req: Request) => {
+  if (!isAdminInitialized()) {
+    throw new Error("Firebase Admin SDK is not initialized on the server");
+  }
+
+  const authHeader = req.headers.get("authorization") || "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  const idToken = match ? match[1] : null;
+
+  if (!idToken) return null;
+
+  try {
+    // `firebaseAdminAuth` is the Admin Auth instance exported from `lib/firebase-admin`
+    const decoded = await firebaseAdminAuth.verifyIdToken(idToken);
+    return { id: decoded.uid, email: decoded.email };
+  } catch (err) {
+    console.error("UploadThing auth: failed to verify ID token", err);
+    return null;
+  }
+};
  
 // FileRouter for your app, can contain multiple FileRoutes
 export const ourFileRouter = {

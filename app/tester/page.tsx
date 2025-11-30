@@ -1,28 +1,18 @@
 "use client";
 
-// Development tester page removed.
-// This page previously allowed direct Firestore writes (venues, bookings)
-// and was intended for local development only. It has been removed to
-// prevent accidental use in production environments. If you need similar
-// functionality locally, recreate a local-only script or gate this page
-// behind an environment flag.
-
-export default function TesterPage(): null {
-                    );
-                    await Promise.all(deletes);
-                    alert("All bookings removed.");
-                  } catch (err) {
-                    console.error(err);
-                    alert("Failed to delete bookings.");
-                  }
-                }}
-              >
-                Clear all bookings
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </AuthGuard>
+export default function TesterPage() {
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-semibold">Developer Tester Tools Removed</h1>
+      <p className="mt-4 text-muted-foreground">
+        The in-app tester page that performed direct Firestore writes has been
+        removed to avoid accidental modifications in staging/production.
+      </p>
+      <p className="mt-4">
+        To run local seed or quick actions, use a dedicated script under
+        `scripts/` or recreate a gated page behind an environment flag like
+        `NEXT_PUBLIC_ENABLE_TESTER=true`.
+      </p>
+    </div>
   );
 }
