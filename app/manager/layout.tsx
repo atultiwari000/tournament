@@ -72,6 +72,11 @@ const ManagerLayout = ({ children }: ManagerLayoutProps) => {
       icon: Settings,
     },
     {
+      href: "/manager/scan-qr",
+      label: "Scan QR",
+      icon: Home,
+    },
+    {
       href: "/",
       label: "Homepage",
       icon: Home,

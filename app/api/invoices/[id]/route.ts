@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, auth, isAdminInitialized } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
+import crypto from 'crypto';
 
 // Server-side invoice generator
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -68,87 +69,135 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       esewaTransactionCode: booking?.esewaTransactionCode || booking?.esewaTransactionUuid || null,
     };
 
-    // Generate PDF using jsPDF (server-side). Use similar layout as client generator.
-    const doc = new jsPDF();
-    doc.setProperties({ title: `Invoice-${invoiceData.bookingId}`, subject: 'Booking Invoice' });
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold' as any);
-    doc.text('INVOICE', 105, 20, { align: 'center' });
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal' as any);
-    doc.text('Futsal Booking System', 105, 30, { align: 'center' });
+    // Prepare QR payload: AES-256-GCM encrypt JSON payload using INVOICE_QR_SECRET
+    const secret = process.env.INVOICE_QR_SECRET || '';
+    // Keep QR payload minimal to reduce encoded data size: only bookingId and timestamp
+    const payloadObj: any = {
+      b: invoiceData.bookingId,
+      t: Date.now(),
+    };
 
-    // Details box
-    doc.setDrawColor(200, 200, 200);
-    doc.setFillColor(245, 245, 245);
-    (doc as any).roundedRect(15, 45, 180, 25, 3, 3, 'FD');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold' as any);
-    doc.text('Invoice Number:', 20, 53);
-    doc.setFont('helvetica', 'normal' as any);
-    doc.text(invoiceData.bookingId, 60, 53);
-    doc.setFont('helvetica', 'bold' as any);
-    doc.text('Date:', 20, 60);
-    doc.setFont('helvetica', 'normal' as any);
-    doc.text(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), 60, 60);
-
-    // Bill to / Venue
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold' as any);
-    doc.text('Bill To:', 15, 85);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal' as any);
-    doc.text(invoiceData.userName || 'Customer', 15, 92);
-    doc.text(invoiceData.userEmail || '', 15, 98);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold' as any);
-    doc.text('Venue Details:', 110, 85);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal' as any);
-    doc.text(invoiceData.venueName, 110, 92);
-    const addressLines = (doc as any).splitTextToSize(invoiceData.venueAddress, 85);
-    doc.text(addressLines, 110, 98);
-
-    autoTable(doc as any, {
-      startY: 115,
-      head: [['Description', 'Details']],
-      body: [
-        ['Booking Date', invoiceData.date],
-        ['Time Slot', `${invoiceData.startTime} - ${invoiceData.endTime}`],
-        ['Duration', '1 Hour'],
-        ['Booking Type', 'Website Booking'],
-      ],
-      theme: 'grid',
-    });
-
-    const finalY = (doc as any).lastAutoTable?.finalY || 155;
-    autoTable(doc as any, {
-      startY: finalY + 10,
-      head: [['Item', 'Amount (NPR)']],
-      body: [['Venue Booking Fee', `Rs. ${invoiceData.amount}`], ['Tax', 'Rs. 0'], ['Service Charge', 'Rs. 0']],
-      foot: [['Total Amount', `Rs. ${invoiceData.amount}`]],
-      theme: 'grid',
-    });
-
-    if (invoiceData.esewaTransactionCode) {
-      const paymentY = (doc as any).lastAutoTable?.finalY || 200;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold' as any);
-      doc.text('Payment Information:', 15, paymentY + 15);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal' as any);
-      doc.text(`Payment Method: eSewa`, 15, paymentY + 22);
-      doc.text(`Transaction ID: ${invoiceData.esewaTransactionCode}`, 15, paymentY + 28);
+    const payloadJson = JSON.stringify(payloadObj);
+    let qrContent: string;
+    if (secret) {
+      try {
+        const key = crypto.createHash('sha256').update(secret).digest(); // 32 bytes
+        const iv = crypto.randomBytes(12); // 96-bit IV for GCM
+        const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+        const encrypted = Buffer.concat([cipher.update(payloadJson, 'utf8'), cipher.final()]);
+        const tag = cipher.getAuthTag();
+        const combined = Buffer.concat([iv, tag, encrypted]);
+        qrContent = combined.toString('base64');
+      } catch (err) {
+        console.warn('Failed to encrypt QR payload, falling back to plain base64:', err);
+        qrContent = Buffer.from(payloadJson).toString('base64');
+      }
+    } else {
+      console.warn('INVOICE_QR_SECRET not set; QR will contain unsigned payload');
+      qrContent = Buffer.from(payloadJson).toString('base64');
     }
+        // Professional invoice layout matching provided example
+        const doc = new jsPDF({ unit: 'pt', format: 'A4' });
+        doc.setProperties({ title: `Invoice-${invoiceData.bookingId}`, subject: 'Booking Invoice' });
 
-    doc.setDrawColor(200, 200, 200);
-    doc.line(15, 270, 195, 270);
-    doc.setFontSize(8);
-    doc.setTextColor(128, 128, 128);
-    doc.text('Thank you for booking with us!', 105, 278, { align: 'center' });
+        const pageWidth = (doc as any).internal.pageSize.getWidth();
+        const margin = 40;
 
-    const fileName = `Invoice-${invoiceData.venueName.replace(/\s+/g, '-')}-${invoiceData.date}-${invoiceData.bookingId.slice(0, 8)}.pdf`;
+        // Large title left
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(36);
+        doc.setTextColor(34, 34, 34);
+        doc.text('INVOICE', margin, 70);
 
+        // Company/subtitle under title
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12);
+        doc.setTextColor(80, 80, 80);
+        doc.text('SajiloKhel', margin, 92);
+
+        // Top-right: Invoice date and Booking ID
+        doc.setFontSize(10);
+        doc.setTextColor(90, 90, 90);
+        const rightX = pageWidth - margin;
+        doc.text(`Invoice Date: ${new Date().toLocaleDateString()}`, rightX, 60, { align: 'right' });
+        doc.text(`Booking ID: ${invoiceData.bookingId}`, rightX, 76, { align: 'right' });
+
+        // Billed To block
+        doc.setFontSize(11);
+        doc.setTextColor(34, 34, 34);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Billed To:', margin, 130);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const billedLine = invoiceData.userName || invoiceData.userEmail || `User ID: ${booking.userId}`;
+        doc.text(String(billedLine), margin, 148);
+
+        // Booking Details header with underline
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Booking Details', margin, 186);
+        // underline
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.8);
+        doc.line(margin, 192, pageWidth - margin, 192);
+
+        // Details rows (left label, right value)
+        const leftColX = margin;
+        const rightColX = pageWidth - margin - 160;
+        let y = 210;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(80, 80, 80);
+
+        const addRow = (label: string, value: string) => {
+          doc.setFont('helvetica', 'normal');
+          doc.text(label, leftColX, y);
+          doc.setFont('helvetica', 'normal');
+          doc.text(value, rightColX, y);
+          y += 18;
+        };
+
+        addRow('Venue', String(invoiceData.venueName || '-'));
+        addRow('Date & Time', `${invoiceData.date} | ${invoiceData.startTime} - ${invoiceData.endTime}`);
+        addRow('Booked By', String(booking.userId || invoiceData.userName || '-'));
+        addRow('Platform', 'Mobile App (SajiloKhel)');
+
+        // Total Amount label and value
+        const formattedAmount = (Number(invoiceData.amount) || 0).toFixed(2);
+        y += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Total Amount', leftColX, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Rs. ${formattedAmount}`, rightColX + 120, y);
+
+        // Large centered QR below (payload is minimal to keep QR simple)
+        try {
+          const qrSizePx = 280; // smaller pixel size now that payload is minimal
+          const qrDataUrl = await QRCode.toDataURL(qrContent, { margin: 0, width: qrSizePx });
+          const qrPdfSize = 200;
+          const qrX = (pageWidth - qrPdfSize) / 2;
+          const qrY = y + 30;
+          doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrPdfSize, qrPdfSize);
+          doc.setFontSize(9);
+          doc.setTextColor(100, 100, 100);
+          doc.text('Scan to verify booking', pageWidth / 2, qrY + qrPdfSize + 18, { align: 'center' });
+        } catch (e) {
+          console.warn('Failed to generate QR image:', e);
+        }
+
+        // Footer line and text
+        const footerY = 780;
+        doc.setDrawColor(220);
+        doc.setLineWidth(0.5);
+        doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+        doc.setFontSize(9);
+        doc.setTextColor(120, 120, 120);
+        doc.text('Thank you for booking with SajiloKhel!', margin, footerY + 4);
+        doc.text('Contact: contact@sajilokhel.com', pageWidth - margin, footerY + 4, { align: 'right' });
+    // (QR already embedded above; professional table/totals were drawn)
+
+    const fileName = `invoice-${invoiceData.bookingId}.pdf`;
     const arrayBuffer = doc.output('arraybuffer');
     const buffer = Buffer.from(arrayBuffer as ArrayBuffer);
 

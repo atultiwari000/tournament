@@ -49,6 +49,8 @@
     "firebase": "^12.4.0",
     "input-otp": "^1.4.2",
     "jspdf": "^3.0.3",
+    "qrcode": "^1.5.1",
+    "qr-scanner": "^1.4.2",
     "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.545.0",
