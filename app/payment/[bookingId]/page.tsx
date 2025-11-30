@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { expireBooking } from "@/app/actions/bookings";
+import { expireBooking, cancelBooking } from "@/app/actions/bookings";
 import { initiateEsewaPayment } from "@/lib/esewa/initiate";
 import {
   Card,
@@ -67,6 +67,29 @@ const PaymentPage = () => {
     },
     [user]
   );
+
+    const handleCancelHold = useCallback(async () => {
+      if (!user || !bookingId) return;
+      setIsProcessing(true);
+      try {
+        const token = await user.getIdToken();
+        const result = await cancelBooking(token, bookingId);
+        if (!result.success) {
+          toast.error(result.error || "Failed to cancel booking");
+          setIsProcessing(false);
+          return;
+        }
+
+        toast.success("Booking cancelled and hold released.");
+        // Redirect to user's bookings and highlight the booking card
+        router.push(`/user/bookings?highlight=${bookingId}`);
+      } catch (err: any) {
+        console.error('Error cancelling booking hold:', err);
+        toast.error(err?.message || 'Failed to cancel booking.');
+      } finally {
+        setIsProcessing(false);
+      }
+    }, [user, bookingId, router]);
 
   useEffect(() => {
     if (!bookingId) {
@@ -269,13 +292,14 @@ const PaymentPage = () => {
             </div>
           )}
         </CardContent>
-        <CardFooter className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <CardFooter className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Button
             variant="outline"
-            onClick={() => router.push(`/venue/${booking.venueId}`)}
+            onClick={handleCancelHold}
             disabled={isProcessing}
+            title="Cancel this booking and release the hold"
           >
-            Cancel
+            Cancel Hold
           </Button>
           <Button
             onClick={handleConfirmPayment}

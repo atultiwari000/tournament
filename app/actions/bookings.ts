@@ -172,6 +172,61 @@ export async function cancelBooking(token: string, bookingId: string) {
   }
 }
 
+export async function releaseHold(token: string, bookingId: string) {
+  try {
+    const userId = await verifyUser(token);
+
+    const bookingRef = db.collection("bookings").doc(bookingId);
+    const bookingDoc = await bookingRef.get();
+
+    if (!bookingDoc.exists) {
+      throw new Error("Booking not found");
+    }
+
+    const booking = bookingDoc.data();
+    if (booking?.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // Only allow releasing hold for pending payments
+    if (booking.status !== "pending_payment") {
+      throw new Error("Booking is not a pending payment hold");
+    }
+
+    // Update booking status to cancelled and record timestamp
+    await bookingRef.update({
+      status: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+    });
+
+    // Release the hold from venueSlots
+    if (booking.venueId && booking.date && booking.startTime) {
+      const venueRef = db.collection("venueSlots").doc(booking.venueId);
+
+      await db.runTransaction(async (t) => {
+        const docSnap = await t.get(venueRef);
+        if (!docSnap.exists) return;
+
+        const data = docSnap.data() as any;
+        const held = (data.held || []).filter(
+          (s: any) => !(s.date === booking.date && s.startTime === booking.startTime)
+        );
+
+        t.update(venueRef, {
+          held,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    }
+
+    revalidatePath("/user/bookings");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error releasing hold:", error);
+    return { success: false, error: error.message || "Failed to release hold" };
+  }
+}
+
 export async function createPhysicalBooking(
   token: string,
   venueId: string,

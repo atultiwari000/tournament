@@ -14,8 +14,7 @@ import {
   
   Timestamp,
 } from "firebase/firestore";
-import { cancelBooking, expireBooking } from "@/app/actions/bookings";
-import { releaseHold } from "@/app/actions/slots";
+import { cancelBooking, expireBooking, releaseHold } from "@/app/actions/bookings";
 import { generateInvoice } from "@/lib/generateInvoice";
 import {
   Card,
@@ -63,6 +62,7 @@ const UserBookingsPage = () => {
   const [venues, setVenues] = useState<{ [key: string]: any }>({});
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [releasingId, setReleasingId] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -317,6 +317,36 @@ const UserBookingsPage = () => {
       toast.error(error.message || "Failed to cancel booking. Please try again.");
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleReleaseHold = async (booking: any) => {
+    setReleasingId(booking.id);
+    try {
+      if (!user) return;
+      const token = await user.getIdToken();
+      const result = await releaseHold(token, booking.id);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to release hold");
+      }
+
+      toast.success("Hold released and booking cancelled.");
+
+      // Refresh bookings list
+      const q = query(
+        collection(db, "bookings"),
+        where("userId", "==", user?.uid),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const bookingsData = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setBookings(bookingsData as any[]);
+    } catch (error: any) {
+      console.error("Error releasing hold:", error);
+      toast.error(error.message || "Failed to release hold. Please try again.");
+    } finally {
+      setReleasingId(null);
     }
   };
 
@@ -768,25 +798,44 @@ const UserBookingsPage = () => {
                     >
                       Complete Payment
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => handleVerifyPaymentStatus(booking)}
-                      disabled={verifyingId === booking.id}
-                    >
-                      {verifyingId === booking.id ? (
-                        <>
-                          <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                          Verifying...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Check Payment Status
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex w-full gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleVerifyPaymentStatus(booking)}
+                        disabled={verifyingId === booking.id}
+                      >
+                        {verifyingId === booking.id ? (
+                          <>
+                            <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                            Verifying...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Check Payment Status
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleReleaseHold(booking)}
+                        disabled={releasingId === booking.id}
+                        title="Cancel held booking"
+                      >
+                        {releasingId === booking.id ? (
+                          <>
+                            <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                            Cancelling...
+                          </>
+                        ) : (
+                          "Cancel Hold"
+                        )}
+                      </Button>
+                    </div>
                   </CardFooter>
                 </Card>
               );
