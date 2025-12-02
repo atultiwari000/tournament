@@ -6,12 +6,12 @@ import QRCode from 'qrcode';
 import crypto from 'crypto';
 
 // Server-side invoice generator
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAdminInitialized()) {
     return NextResponse.json({ error: 'Server misconfigured: Admin SDK not initialized' }, { status: 500 });
   }
 
-  const bookingId = params.id;
+  const { id: bookingId } = await params;
 
   // Authenticate caller
   const authHeader = request.headers.get('authorization') || '';
@@ -224,6 +224,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const fileName = `invoice-${invoiceData.bookingId}.pdf`;
     const arrayBuffer = doc.output('arraybuffer');
     const buffer = Buffer.from(arrayBuffer as ArrayBuffer);
+    
+    console.log('✅ Invoice PDF generated successfully:', fileName, 'Size:', buffer.length, 'bytes');
 
     return new Response(buffer, {
       headers: {
@@ -231,8 +233,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         'Content-Disposition': `attachment; filename="${fileName}"`,
       },
     });
-  } catch (err) {
-    console.error('Invoice generation error:', err);
-    return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 });
+  } catch (err: any) {
+    console.error('❌ Invoice generation error:', err);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    return NextResponse.json({ 
+      error: 'Failed to generate invoice',
+      details: err.message 
+    }, { status: 500 });
   }
 }
